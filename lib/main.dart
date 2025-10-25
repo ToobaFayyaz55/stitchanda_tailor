@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'theme/theme.dart';
 import 'view/screens/login_screen.dart';
+import 'view/screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +23,7 @@ class MyApp extends StatelessWidget {
       title: 'Stitchanda Tailor',
       // 👇 Use whichever you have defined in theme.dart
       theme: buildAppTheme(), // or lightTheme
-      home: const LoginScreen(),
+      home: const HomeScreen(),
     );
   }
 }
