@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "623970889745",
+    "project_id": "stichanda-1cacd",
+    "storage_bucket": "stichanda-1cacd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:623970889745:android:d1c568b3b4b2a37ecf81b0",
+        "android_client_info": {
+          "package_name": "com.example.stichanda_customer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtmFLpnF0-vOl1ZSA90hbqchzXNUiPuh0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:623970889745:android:46081083cfce4ed8cf81b0",
+        "android_client_info": {
+          "package_name": "com.example.stichanda_driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtmFLpnF0-vOl1ZSA90hbqchzXNUiPuh0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:623970889745:android:5f86c2ccfa01b176cf81b0",
+        "android_client_info": {
+          "package_name": "com.example.stichanda_tailor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBtmFLpnF0-vOl1ZSA90hbqchzXNUiPuh0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
