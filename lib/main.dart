@@ -23,7 +23,7 @@ class MyApp extends StatelessWidget {
       title: 'Stitchanda Tailor',
       // 👇 Use whichever you have defined in theme.dart
       theme: buildAppTheme(), // or lightTheme
-      home: const HomeScreen(),
+      home: const LoginScreen(),
     );
   }
 }

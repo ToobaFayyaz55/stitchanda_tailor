@@ -1,8 +1,13 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
+import 'package:stichanda_tailor/view/screens/home_screen.dart';
 import 'registration/personal_info_screen.dart';
+
+// ✅ Dummy Tailor Login Credentials
+const String dummyEmail = "laiba@gmail.com";
+const String dummyUsername = "laiba";
+const String dummyPassword = "123456";
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,6 +22,41 @@ class _LoginScreenState extends State<LoginScreen> {
   bool obscure = true;
   bool loading = false;
 
+  void _login() async {
+    final input = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    if (input.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill all fields")),
+      );
+      return;
+    }
+
+    setState(() => loading = true);
+
+    await Future.delayed(const Duration(seconds: 1)); // fake loading
+
+    bool isValidEmail = input == dummyEmail;
+    bool isValidUsername = input.toLowerCase() == dummyUsername.toLowerCase();
+    bool isCorrectPassword = password == dummyPassword;
+
+    if ((isValidEmail || isValidUsername) && isCorrectPassword) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const HomeScreen(),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid email/username or password")),
+      );
+    }
+
+    setState(() => loading = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -29,7 +69,6 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const SizedBox(height: 60),
 
-              ///  Center Logo (replace image with your logo)
               Center(
                 child: Image.asset(
                   "assets/images/logo2.png",
@@ -39,7 +78,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 25),
 
-              /// Header Text
               const Text(
                 "Welcome back",
                 style: TextStyle(
@@ -59,18 +97,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 35),
 
-              /// Email Field
               TextField(
                 controller: emailController,
-                keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
-                  labelText: "Email Address",
-                  prefixIcon: Icon(Icons.email_outlined),
+                  labelText: "Email / Username",
+                  prefixIcon: Icon(Icons.person_outline),
                 ),
               ),
+
               const SizedBox(height: 16),
 
-              /// Password Field
               TextField(
                 controller: passwordController,
                 obscureText: obscure,
@@ -86,8 +122,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-
-              /// Forgot Password
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -104,11 +138,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 20),
 
-              /// Login Button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: loading ? null : () async {},
+                  onPressed: loading ? null : _login,
                   child: loading
                       ? const CircularProgressIndicator(color: Colors.white)
                       : const Text("Login"),
@@ -117,7 +150,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 35),
 
-              /// Footer Text
               RichText(
                 text: TextSpan(
                   text: "Don’t have an account? ",
@@ -138,14 +170,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (context) =>
-                                const PersonalInfoScreen()),
+                              builder: (context) =>
+                              const PersonalInfoScreen(),
+                            ),
                           );
                         },
                     )
                   ],
                 ),
               ),
+
               const SizedBox(height: 20),
             ],
           ),

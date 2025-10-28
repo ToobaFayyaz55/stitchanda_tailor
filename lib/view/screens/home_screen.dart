@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import '../../data/mock_data.dart';
+import '../../data/models/tailor_dummy.dart'; //
 import '../base/custom_bottom_nav_bar.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -9,7 +10,6 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // show orders with status = inProgress on this Home screen
     final List<Order> inProgressOrders =
     mockOrders.where((o) => o.status == OrderStatus.inProgress).toList();
 
@@ -29,8 +29,10 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 24),
               _buildOrdersHeader(context),
               const SizedBox(height: 8),
-              // build each order tile
-              ...inProgressOrders.map((order) => PendingOrderTile(order: order)).toList(),
+
+              ...inProgressOrders
+                  .map((order) => PendingOrderTile(order: order))
+                  .toList(),
             ],
           ),
         ),
@@ -56,7 +58,7 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-/// ---------------- Profile Header Card ----------------
+/// PROFILE HEADER
 class ProfileHeaderCard extends StatefulWidget {
   const ProfileHeaderCard({super.key});
 
@@ -91,39 +93,43 @@ class _ProfileHeaderCardState extends State<ProfileHeaderCard> {
             backgroundColor: AppColors.beige,
             child: Icon(Icons.person, color: AppColors.deepBrown),
           ),
+
           const SizedBox(width: 12),
+
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Laiba Majeed',
+                currentTailor.name,
                 style: Theme.of(context).textTheme.bodyLarge!.copyWith(
                   fontWeight: FontWeight.w600,
                   color: AppColors.deepBrown,
                 ),
               ),
               Text(
-                'Tailor',
+                currentTailor.role,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
           ),
+
           const Spacer(),
+
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 _isAvailable ? 'Available' : 'Offline',
                 style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                  color: _isAvailable ? AppColors.success : AppColors.textGrey,
+                  color: _isAvailable
+                      ? AppColors.success
+                      : AppColors.textGrey,
                 ),
               ),
               Switch(
                 value: _isAvailable,
-                onChanged: (bool value) {
-                  setState(() {
-                    _isAvailable = value;
-                  });
+                onChanged: (value) {
+                  setState(() => _isAvailable = value);
                 },
                 activeColor: AppColors.caramel,
                 inactiveThumbColor: AppColors.iconGrey,
@@ -137,7 +143,7 @@ class _ProfileHeaderCardState extends State<ProfileHeaderCard> {
   }
 }
 
-/// ---------------- Stats Grid ----------------
+/// STATS GRID
 class StatsGrid extends StatelessWidget {
   const StatsGrid({super.key});
 
@@ -154,7 +160,7 @@ class StatsGrid extends StatelessWidget {
         _StatCard(title: 'Active Orders', value: '3'),
         _StatCard(title: 'Completed', value: '15'),
         _StatCard(title: 'Avg. Rating', value: '4.8'),
-        _StatCard(title: 'Earnings', value: '20K Pkr'),
+        _StatCard(title: 'Earnings', value: '20K PKR'),
       ],
     );
   }
@@ -197,7 +203,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-/// ---------------- Pending Order Tile ----------------
+/// ORDER TILE
 class PendingOrderTile extends StatelessWidget {
   final Order order;
   const PendingOrderTile({super.key, required this.order});
@@ -221,22 +227,27 @@ class PendingOrderTile extends StatelessWidget {
         side: const BorderSide(color: AppColors.outline),
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        contentPadding:
+        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(order.id, style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 2),
-            Text(order.title,
-                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textBlack,
-                )),
+            Text(
+              order.title,
+              style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textBlack,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text('Client: ${order.client}',
-                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                  color: AppColors.textGrey,
-                )),
+            Text(
+              'Client: ${order.client}',
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                color: AppColors.textGrey,
+              ),
+            ),
           ],
         ),
         subtitle: Padding(
@@ -245,14 +256,16 @@ class PendingOrderTile extends StatelessWidget {
             children: [
               Icon(Icons.access_time, size: 14, color: statusColor),
               const SizedBox(width: 4),
-              Text(order.daysLeft,
-                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                    color: statusColor,
-                    fontWeight: FontWeight.w500,
-                  )),
+              Text(
+                order.daysLeft,
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                  color: statusColor,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               const Spacer(),
               Text(
-                order.status == OrderStatus.completed ? 'Completed' : 'In Progress',
+                'In Progress',
                 style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                   color: AppColors.deepBrown,
                   fontWeight: FontWeight.w500,
@@ -261,9 +274,10 @@ class PendingOrderTile extends StatelessWidget {
             ],
           ),
         ),
-        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.iconGrey),
+        trailing:
+        Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.iconGrey),
         onTap: () {
-          // TODO: navigate to order detail screen
+          // TODO: Order details navigation
         },
       ),
     );
