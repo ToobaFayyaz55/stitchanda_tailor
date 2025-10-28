@@ -1,56 +1,25 @@
+// lib/view/home/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
-
-// --- Dummy Data ---
-class Order {
-  final String id;
-  final String title;
-  final String client;
-  final String daysLeft;
-
-  Order({
-    required this.id,
-    required this.title,
-    required this.client,
-    required this.daysLeft,
-  });
-}
-
-final List<Order> pendingOrders = [
-  Order(
-    id: '#12345',
-    title: 'Suit Alteration',
-    client: 'Atif Aslam',
-    daysLeft: '2 days left',
-  ),
-  Order(
-    id: '#12346',
-    title: 'Bridal Suit',
-    client: 'Justin Bieber',
-    daysLeft: '10 days left',
-  ),
-  Order(
-    id: '#12347',
-    title: 'Party Dress',
-    client: 'Tooba Fayyaz',
-    daysLeft: '28 days left',
-  ),
-];
-// -----------------
+import '../../data/mock_data.dart';
+import '../base/custom_bottom_nav_bar.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // show orders with status = inProgress on this Home screen
+    final List<Order> inProgressOrders =
+    mockOrders.where((o) => o.status == OrderStatus.inProgress).toList();
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Home Screen'), // Matches the text in the image
-        // The rest of the styling comes from appBarTheme in theme.dart
+        title: const Text('Home'),
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(12.0),
+          padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -58,35 +27,36 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 16),
               const StatsGrid(),
               const SizedBox(height: 24),
-              _buildPendingOrdersHeader(context),
+              _buildOrdersHeader(context),
               const SizedBox(height: 8),
-              ...pendingOrders.map((order) => PendingOrderTile(order: order)).toList(),
+              // build each order tile
+              ...inProgressOrders.map((order) => PendingOrderTile(order: order)).toList(),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: const CustomBottomNavBar(),
+      bottomNavigationBar: const CustomBottomNavBar(activeIndex: 2),
     );
   }
 
-  Widget _buildPendingOrdersHeader(BuildContext context) {
+  Widget _buildOrdersHeader(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          'Pending Orders',
-          style: Theme.of(context).textTheme.titleLarge, // Using titleLarge for section heading
+          'In Progress Orders',
+          style: Theme.of(context).textTheme.titleLarge,
         ),
         TextButton(
           onPressed: () {},
-          child: const Text('View All'), // Styled by textButtonTheme
+          child: const Text('View All'),
         ),
       ],
     );
   }
 }
 
-// --- 1. Profile Header Card ---
+/// ---------------- Profile Header Card ----------------
 class ProfileHeaderCard extends StatefulWidget {
   const ProfileHeaderCard({super.key});
 
@@ -102,9 +72,9 @@ class _ProfileHeaderCardState extends State<ProfileHeaderCard> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface, // From your theme
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outline), // Soft border
+        border: Border.all(color: AppColors.outline),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -118,8 +88,8 @@ class _ProfileHeaderCardState extends State<ProfileHeaderCard> {
         children: [
           const CircleAvatar(
             radius: 24,
-            backgroundImage: AssetImage('assets/images/laiba.png'), // Placeholder
             backgroundColor: AppColors.beige,
+            child: Icon(Icons.person, color: AppColors.deepBrown),
           ),
           const SizedBox(width: 12),
           Column(
@@ -129,12 +99,12 @@ class _ProfileHeaderCardState extends State<ProfileHeaderCard> {
                 'Laiba Majeed',
                 style: Theme.of(context).textTheme.bodyLarge!.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: AppColors.deepBrown, // Use deepBrown for primary text
+                  color: AppColors.deepBrown,
                 ),
               ),
               Text(
                 'Tailor',
-                style: Theme.of(context).textTheme.bodyMedium, // Use bodyMedium for subtitle
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
           ),
@@ -143,7 +113,7 @@ class _ProfileHeaderCardState extends State<ProfileHeaderCard> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                'Available',
+                _isAvailable ? 'Available' : 'Offline',
                 style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                   color: _isAvailable ? AppColors.success : AppColors.textGrey,
                 ),
@@ -155,7 +125,7 @@ class _ProfileHeaderCardState extends State<ProfileHeaderCard> {
                     _isAvailable = value;
                   });
                 },
-                activeColor: AppColors.caramel, // Main accent
+                activeColor: AppColors.caramel,
                 inactiveThumbColor: AppColors.iconGrey,
                 inactiveTrackColor: AppColors.outline,
               ),
@@ -167,7 +137,7 @@ class _ProfileHeaderCardState extends State<ProfileHeaderCard> {
   }
 }
 
-// --- 2. Stats Grid ---
+/// ---------------- Stats Grid ----------------
 class StatsGrid extends StatelessWidget {
   const StatsGrid({super.key});
 
@@ -178,8 +148,8 @@ class StatsGrid extends StatelessWidget {
       crossAxisCount: 2,
       crossAxisSpacing: 12,
       mainAxisSpacing: 12,
-      childAspectRatio: 1.8, // Adjust for desired card shape
-      physics: const NeverScrollableScrollPhysics(), // Important for nested scroll views
+      childAspectRatio: 1.8,
+      physics: const NeverScrollableScrollPhysics(),
       children: const [
         _StatCard(title: 'Active Orders', value: '3'),
         _StatCard(title: 'Completed', value: '15'),
@@ -193,7 +163,6 @@ class StatsGrid extends StatelessWidget {
 class _StatCard extends StatelessWidget {
   final String title;
   final String value;
-
   const _StatCard({required this.title, required this.value});
 
   @override
@@ -201,7 +170,7 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.beige, // Lighter accent color
+        color: AppColors.beige,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -211,15 +180,15 @@ class _StatCard extends StatelessWidget {
           Text(
             title,
             style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: AppColors.deepBrown,
+              color: AppColors.textBlack,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
             style: Theme.of(context).textTheme.titleLarge!.copyWith(
-              color: AppColors.deepBrown,
-              fontSize: 28, // Slightly larger for impact
+              color: AppColors.textBlack,
+              fontSize: 28,
             ),
           ),
         ],
@@ -228,132 +197,74 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// --- 3. Pending Order Tile ---
+/// ---------------- Pending Order Tile ----------------
 class PendingOrderTile extends StatelessWidget {
   final Order order;
-
   const PendingOrderTile({super.key, required this.order});
+
+  Color _getDaysLeftColor(String daysLeft) {
+    final int days = int.tryParse(daysLeft.split(' ')[0]) ?? 99;
+    if (days <= 5) return AppColors.error;
+    if (days <= 15) return AppColors.caramel;
+    return AppColors.success;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final statusColor = _getDaysLeftColor(order.daysLeft);
+
     return Card(
-      elevation: 0, // Remove default card elevation
+      elevation: 0,
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: AppColors.outline), // Use outline for border
+        side: const BorderSide(color: AppColors.outline),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              order.id,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            Text(order.id, style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 2),
-            Text(
-              order.title,
-              style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textBlack,
-              ),
-            ),
+            Text(order.title,
+                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textBlack,
+                )),
             const SizedBox(height: 4),
-            Text(
-              'Client: ${order.client}',
-              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                color: AppColors.textGrey,
-              ),
-            ),
+            Text('Client: ${order.client}',
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                  color: AppColors.textGrey,
+                )),
           ],
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 8.0),
           child: Row(
             children: [
-              Icon(Icons.access_time, size: 14, color: _getDaysLeftColor(order.daysLeft)),
+              Icon(Icons.access_time, size: 14, color: statusColor),
               const SizedBox(width: 4),
-              Text(
-                order.daysLeft,
-                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                  color: _getDaysLeftColor(order.daysLeft),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              Text(order.daysLeft,
+                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                    color: statusColor,
+                    fontWeight: FontWeight.w500,
+                  )),
               const Spacer(),
               Text(
-                'In Progress',
+                order.status == OrderStatus.completed ? 'Completed' : 'In Progress',
                 style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                  color: AppColors.deepBrown, // A soft color for status
+                  color: AppColors.deepBrown,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
         ),
-        trailing: Icon(
-          Icons.arrow_forward_ios,
-          size: 16,
-          color: AppColors.iconGrey,
-        ),
+        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.iconGrey),
         onTap: () {
-          // Navigate to order details
+          // TODO: navigate to order detail screen
         },
-      ),
-    );
-  }
-
-  // Helper to change color based on urgency
-  Color _getDaysLeftColor(String daysLeft) {
-    final int days = int.tryParse(daysLeft.split(' ')[0]) ?? 99;
-    if (days <= 5) {
-      return AppColors.error; // Red for urgent
-    } else if (days <= 15) {
-      return AppColors.caramel; // Caramel for getting close
-    } else {
-      return AppColors.success; // Green/Success for long time left
-    }
-  }
-}
-
-// --- 4. Custom Bottom Navigation Bar ---
-class CustomBottomNavBar extends StatelessWidget {
-  const CustomBottomNavBar({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border(
-          top: BorderSide(color: AppColors.outline),
-        ),
-      ),
-      child: BottomNavigationBar(
-        currentIndex: 2, // Highlight 'Home'
-        backgroundColor: AppColors.surface,
-        selectedItemColor: AppColors.caramel, // Caramel for active item
-        unselectedItemColor: AppColors.iconGrey, // IconGrey for inactive items
-        showUnselectedLabels: true,
-        type: BottomNavigationBarType.fixed, // To show all labels
-        selectedLabelStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: AppColors.caramel,
-        ),
-        unselectedLabelStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
-          fontSize: 12,
-          color: AppColors.iconGrey,
-        ),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Chat'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: 'Orders'),
-          BottomNavigationBarItem(icon: Icon(Icons.content_paste), label: 'Requests'),
-        ],
       ),
     );
   }
