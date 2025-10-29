@@ -1,8 +1,12 @@
-// lib/view/home/home_screen.dart
+// lib/view/screens/home_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+// Import the cubit only (do NOT import auth_state.dart directly to avoid "part of" import errors).
+import 'package:stichanda_tailor/controller/auth_cubit.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import '../../data/mock_data.dart';
-import '../../data/models/tailor_dummy.dart'; //
+import '../../data/models/tailor_dummy.dart';
 import '../base/custom_bottom_nav_bar.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -10,6 +14,7 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // show orders with status = inProgress on this Home screen
     final List<Order> inProgressOrders =
     mockOrders.where((o) => o.status == OrderStatus.inProgress).toList();
 
@@ -17,26 +22,58 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Home'),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const ProfileHeaderCard(),
-              const SizedBox(height: 16),
-              const StatsGrid(),
-              const SizedBox(height: 24),
-              _buildOrdersHeader(context),
-              const SizedBox(height: 8),
 
-              ...inProgressOrders
-                  .map((order) => PendingOrderTile(order: order))
-                  .toList(),
-            ],
-          ),
-        ),
+      // Listen to AuthCubit state and show profile when available
+      body: BlocBuilder<AuthCubit, dynamic>(
+        builder: (context, state) {
+          // If your AuthCubit exposes specific state classes (AuthLoading/AuthSuccess),
+          // these will still work if they are visible via auth_cubit.dart
+          if (state != null && state.runtimeType.toString() == 'AuthLoading') {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // Try to extract a profile object from the state robustly:
+          // check for common field names (userProfile / user / tailor).
+          var tailorFromState;
+          try {
+            tailorFromState =
+                (state as dynamic).userProfile ?? (state as dynamic).user ?? (state as dynamic).tailor;
+          } catch (_) {
+            tailorFromState = null;
+          }
+
+          // If no profile in state, fall back to dummy local currentTailor
+          final tailor = tailorFromState ?? currentTailor;
+
+          // Build content
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Pass name + role to header card
+                ProfileHeaderCard(
+                  name: tailor.name ?? currentTailor.name,
+                  role: tailor.role ?? currentTailor.role,
+                ),
+                const SizedBox(height: 16),
+
+                const StatsGrid(),
+                const SizedBox(height: 24),
+
+                _buildOrdersHeader(context),
+                const SizedBox(height: 8),
+
+                // Render in-progress orders
+                ...inProgressOrders
+                    .map((order) => PendingOrderTile(order: order))
+                    .toList(),
+              ],
+            ),
+          );
+        },
       ),
+
       bottomNavigationBar: const CustomBottomNavBar(activeIndex: 2),
     );
   }
@@ -58,9 +95,16 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-/// PROFILE HEADER
+/// ---------------- Profile Header Card ----------------
 class ProfileHeaderCard extends StatefulWidget {
-  const ProfileHeaderCard({super.key});
+  final String name;
+  final String role;
+
+  const ProfileHeaderCard({
+    super.key,
+    required this.name,
+    required this.role,
+  });
 
   @override
   State<ProfileHeaderCard> createState() => _ProfileHeaderCardState();
@@ -93,43 +137,39 @@ class _ProfileHeaderCardState extends State<ProfileHeaderCard> {
             backgroundColor: AppColors.beige,
             child: Icon(Icons.person, color: AppColors.deepBrown),
           ),
-
           const SizedBox(width: 12),
-
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                currentTailor.name,
+                widget.name,
                 style: Theme.of(context).textTheme.bodyLarge!.copyWith(
                   fontWeight: FontWeight.w600,
                   color: AppColors.deepBrown,
                 ),
               ),
               Text(
-                currentTailor.role,
+                widget.role,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
           ),
-
           const Spacer(),
-
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 _isAvailable ? 'Available' : 'Offline',
                 style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                  color: _isAvailable
-                      ? AppColors.success
-                      : AppColors.textGrey,
+                  color: _isAvailable ? AppColors.success : AppColors.textGrey,
                 ),
               ),
               Switch(
                 value: _isAvailable,
-                onChanged: (value) {
-                  setState(() => _isAvailable = value);
+                onChanged: (bool value) {
+                  setState(() {
+                    _isAvailable = value;
+                  });
                 },
                 activeColor: AppColors.caramel,
                 inactiveThumbColor: AppColors.iconGrey,
@@ -143,7 +183,7 @@ class _ProfileHeaderCardState extends State<ProfileHeaderCard> {
   }
 }
 
-/// STATS GRID
+/// ---------------- Stats Grid ----------------
 class StatsGrid extends StatelessWidget {
   const StatsGrid({super.key});
 
@@ -185,9 +225,8 @@ class _StatCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: AppColors.textBlack,
-            ),
+            style:
+            Theme.of(context).textTheme.bodyMedium!.copyWith(color: AppColors.textBlack),
           ),
           const SizedBox(height: 4),
           Text(
@@ -203,7 +242,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-/// ORDER TILE
+/// ---------------- Pending Order Tile ----------------
 class PendingOrderTile extends StatelessWidget {
   final Order order;
   const PendingOrderTile({super.key, required this.order});
@@ -227,27 +266,21 @@ class PendingOrderTile extends StatelessWidget {
         side: const BorderSide(color: AppColors.outline),
       ),
       child: ListTile(
-        contentPadding:
-        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(order.id, style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 2),
-            Text(
-              order.title,
-              style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.textBlack,
-              ),
-            ),
+            Text(order.title,
+                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textBlack,
+                )),
             const SizedBox(height: 4),
-            Text(
-              'Client: ${order.client}',
-              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                color: AppColors.textGrey,
-              ),
-            ),
+            Text('Client: ${order.client}',
+                style:
+                Theme.of(context).textTheme.bodyMedium!.copyWith(color: AppColors.textGrey)),
           ],
         ),
         subtitle: Padding(
@@ -256,16 +289,14 @@ class PendingOrderTile extends StatelessWidget {
             children: [
               Icon(Icons.access_time, size: 14, color: statusColor),
               const SizedBox(width: 4),
-              Text(
-                order.daysLeft,
-                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                  color: statusColor,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+              Text(order.daysLeft,
+                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                    color: statusColor,
+                    fontWeight: FontWeight.w500,
+                  )),
               const Spacer(),
               Text(
-                'In Progress',
+                order.status == OrderStatus.completed ? 'Completed' : 'In Progress',
                 style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                   color: AppColors.deepBrown,
                   fontWeight: FontWeight.w500,
@@ -274,10 +305,9 @@ class PendingOrderTile extends StatelessWidget {
             ],
           ),
         ),
-        trailing:
-        Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.iconGrey),
+        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.iconGrey),
         onTap: () {
-          // TODO: Order details navigation
+          // TODO: navigate to order details
         },
       ),
     );
