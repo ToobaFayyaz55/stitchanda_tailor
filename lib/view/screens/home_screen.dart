@@ -1,315 +1,352 @@
-// lib/view/screens/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-// Import the cubit only (do NOT import auth_state.dart directly to avoid "part of" import errors).
+import 'package:stichanda_tailor/controller/order_cubit.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
+import 'package:stichanda_tailor/data/models/order_detail_model.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
-import '../../data/mock_data.dart';
-import '../../data/models/tailor_dummy.dart';
-import '../base/custom_bottom_nav_bar.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({Key? key}) : super(key: key);
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Fetch orders when screen loads
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthSuccess) {
+      context.read<OrderCubit>().fetchPendingOrderDetailsForTailor(
+            authState.tailor.tailor_id,
+          );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // show orders with status = inProgress on this Home screen
-    final List<Order> inProgressOrders =
-    mockOrders.where((o) => o.status == OrderStatus.inProgress).toList();
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Home'),
+        title: const Text('Orders Dashboard'),
+        backgroundColor: AppColors.caramel,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              context.read<AuthCubit>().logout();
+              Navigator.pushReplacementNamed(context, '/login');
+            },
+          ),
+        ],
       ),
-
-      // Listen to AuthCubit state and show profile when available
-      body: BlocBuilder<AuthCubit, dynamic>(
+      body: BlocConsumer<OrderCubit, OrderState>(
+        listener: (context, state) {
+          if (state is OrderError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
         builder: (context, state) {
-          // If your AuthCubit exposes specific state classes (AuthLoading/AuthSuccess),
-          // these will still work if they are visible via auth_cubit.dart
-          if (state != null && state.runtimeType.toString() == 'AuthLoading') {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          // Try to extract a profile object from the state robustly:
-          // check for common field names (userProfile / user / tailor).
-          var tailorFromState;
-          try {
-            tailorFromState =
-                (state as dynamic).userProfile ?? (state as dynamic).user ?? (state as dynamic).tailor;
-          } catch (_) {
-            tailorFromState = null;
-          }
-
-          // If no profile in state, fall back to dummy local currentTailor
-          final tailor = tailorFromState ?? currentTailor;
-
-          // Build content
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Pass name + role to header card
-                ProfileHeaderCard(
-                  name: tailor.name ?? currentTailor.name,
-                  role: tailor.role ?? currentTailor.role,
+          if (state is OrderLoading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          } else if (state is OrderDetailsSuccess) {
+            if (state.orderDetails.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.shopping_bag_outlined,
+                      size: 80,
+                      color: AppColors.textGrey,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No Orders Found',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'You don\'t have any orders yet',
+                      style: TextStyle(color: AppColors.textGrey),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
+              );
+            }
 
-                const StatsGrid(),
-                const SizedBox(height: 24),
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: state.orderDetails.length,
+              itemBuilder: (context, index) {
+                final orderDetail = state.orderDetails[index];
+                return OrderDetailCard(orderDetail: orderDetail);
+              },
+            );
+          } else if (state is OrderError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 80,
+                    color: Colors.red,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading orders',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    state.message,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      final authState = context.read<AuthCubit>().state;
+                      if (authState is AuthSuccess) {
+                        context.read<OrderCubit>().fetchPendingOrderDetailsForTailor(
+                              authState.tailor.tailor_id,
+                            );
+                      }
+                    },
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
 
-                _buildOrdersHeader(context),
-                const SizedBox(height: 8),
-
-                // Render in-progress orders
-                ...inProgressOrders
-                    .map((order) => PendingOrderTile(order: order))
-                    .toList(),
-              ],
-            ),
+          return const Center(
+            child: Text('No data'),
           );
         },
       ),
-
-      bottomNavigationBar: const CustomBottomNavBar(activeIndex: 2),
-    );
-  }
-
-  Widget _buildOrdersHeader(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'In Progress Orders',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        TextButton(
-          onPressed: () {},
-          child: const Text('View All'),
-        ),
-      ],
-    );
-  }
-}
-
-/// ---------------- Profile Header Card ----------------
-class ProfileHeaderCard extends StatefulWidget {
-  final String name;
-  final String role;
-
-  const ProfileHeaderCard({
-    super.key,
-    required this.name,
-    required this.role,
-  });
-
-  @override
-  State<ProfileHeaderCard> createState() => _ProfileHeaderCardState();
-}
-
-class _ProfileHeaderCardState extends State<ProfileHeaderCard> {
-  bool _isAvailable = true;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outline),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.beige,
-            child: Icon(Icons.person, color: AppColors.deepBrown),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.name,
-                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.deepBrown,
-                ),
-              ),
-              Text(
-                widget.role,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
-          ),
-          const Spacer(),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                _isAvailable ? 'Available' : 'Offline',
-                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                  color: _isAvailable ? AppColors.success : AppColors.textGrey,
-                ),
-              ),
-              Switch(
-                value: _isAvailable,
-                onChanged: (bool value) {
-                  setState(() {
-                    _isAvailable = value;
-                  });
-                },
-                activeColor: AppColors.caramel,
-                inactiveThumbColor: AppColors.iconGrey,
-                inactiveTrackColor: AppColors.outline,
-              ),
-            ],
-          ),
-        ],
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: AppColors.caramel,
+        onPressed: () {
+          final authState = context.read<AuthCubit>().state;
+          if (authState is AuthSuccess) {
+            context.read<OrderCubit>().fetchPendingOrderDetailsForTailor(
+                  authState.tailor.tailor_id,
+                );
+          }
+        },
+        child: const Icon(Icons.refresh),
       ),
     );
   }
 }
 
-/// ---------------- Stats Grid ----------------
-class StatsGrid extends StatelessWidget {
-  const StatsGrid({super.key});
+// ==================== ORDER DETAIL CARD WIDGET ====================
 
-  @override
-  Widget build(BuildContext context) {
-    return GridView.count(
-      shrinkWrap: true,
-      crossAxisCount: 2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.8,
-      physics: const NeverScrollableScrollPhysics(),
-      children: const [
-        _StatCard(title: 'Active Orders', value: '3'),
-        _StatCard(title: 'Completed', value: '15'),
-        _StatCard(title: 'Avg. Rating', value: '4.8'),
-        _StatCard(title: 'Earnings', value: '20K PKR'),
-      ],
-    );
+class OrderDetailCard extends StatelessWidget {
+  final OrderDetail orderDetail;
+
+  const OrderDetailCard({
+    Key? key,
+    required this.orderDetail,
+  }) : super(key: key);
+
+  String _getStatusLabel(int status) {
+    switch (status) {
+      case -1:
+        return 'Pending';
+      case 0:
+        return 'Accepted';
+      case 1:
+        return 'In Progress';
+      case 2:
+        return 'Completed';
+      default:
+        return 'Unknown';
+    }
   }
-}
 
-class _StatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  const _StatCard({required this.title, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.beige,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            title,
-            style:
-            Theme.of(context).textTheme.bodyMedium!.copyWith(color: AppColors.textBlack),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge!.copyWith(
-              color: AppColors.textBlack,
-              fontSize: 28,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// ---------------- Pending Order Tile ----------------
-class PendingOrderTile extends StatelessWidget {
-  final Order order;
-  const PendingOrderTile({super.key, required this.order});
-
-  Color _getDaysLeftColor(String daysLeft) {
-    final int days = int.tryParse(daysLeft.split(' ')[0]) ?? 99;
-    if (days <= 5) return AppColors.error;
-    if (days <= 15) return AppColors.caramel;
-    return AppColors.success;
+  Color _getStatusColor(int status) {
+    switch (status) {
+      case -1:
+        return Colors.orange;
+      case 0:
+        return Colors.blue;
+      case 1:
+        return Colors.purple;
+      case 2:
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = _getDaysLeftColor(order.daysLeft);
-
     return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: AppColors.outline),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        title: Column(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(order.id, style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 2),
-            Text(order.title,
-                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textBlack,
-                )),
-            const SizedBox(height: 4),
-            Text('Client: ${order.client}',
-                style:
-                Theme.of(context).textTheme.bodyMedium!.copyWith(color: AppColors.textGrey)),
-          ],
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 8.0),
-          child: Row(
-            children: [
-              Icon(Icons.access_time, size: 14, color: statusColor),
-              const SizedBox(width: 4),
-              Text(order.daysLeft,
-                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                    color: statusColor,
-                    fontWeight: FontWeight.w500,
-                  )),
-              const Spacer(),
-              Text(
-                order.status == OrderStatus.completed ? 'Completed' : 'In Progress',
-                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                  color: AppColors.deepBrown,
-                  fontWeight: FontWeight.w500,
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        orderDetail.customerName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        orderDetail.orderId,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textGrey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(orderDetail.status),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _getStatusLabel(orderDetail.status),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Description
+            Text(
+              orderDetail.description,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textBlack,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 12),
+
+            // Measurements
+            if (orderDetail.measurements != null) ...[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Measurements',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Chest: ${orderDetail.measurements!.chest}',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        Text(
+                          'Waist: ${orderDetail.measurements!.waist}',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        Text(
+                          'Shoulder: ${orderDetail.measurements!.shoulder}',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(height: 12),
             ],
-          ),
+
+            // Footer with price and payment status
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Price: Rs. ${orderDetail.totalPrice}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.caramel,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Payment: ${orderDetail.paymentStatus}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: orderDetail.paymentStatus == 'Pending'
+                            ? Colors.orange
+                            : Colors.green,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.caramel,
+                  ),
+                  onPressed: () {
+                    // Navigate to order detail screen
+                  },
+                  child: const Text(
+                    'View',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.iconGrey),
-        onTap: () {
-          // TODO: navigate to order details
-        },
       ),
     );
   }
 }
+

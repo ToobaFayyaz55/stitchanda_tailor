@@ -1,20 +1,6 @@
 part of 'auth_cubit.dart';
 
-abstract class AuthState extends Equatable {
-  @override
-  List<Object?> get props => [];
-}
+// All state definitions are in auth_cubit.dart
+// This file is intentionally empty or can be removed.
+// States are defined using sealed class pattern in auth_cubit.dart
 
-class AuthInitial extends AuthState {}
-
-class AuthLoading extends AuthState {}
-
-class AuthSuccess extends AuthState {}
-
-class AuthError extends AuthState {
-  final String message;
-  AuthError(this.message);
-
-  @override
-  List<Object?> get props => [message];
-}

@@ -1,8 +1,9 @@
-// lib/view/orders/orders_screen.dart
-
 import 'package:flutter/material.dart';
-import '../../theme/theme.dart';
-import '../../data/mock_data.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:stichanda_tailor/theme/theme.dart';
+import 'package:stichanda_tailor/controller/order_cubit.dart';
+import 'package:stichanda_tailor/controller/auth_cubit.dart';
+import 'package:stichanda_tailor/data/models/order_detail_model.dart';
 import '../base/custom_bottom_nav_bar.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -13,270 +14,341 @@ class OrdersScreen extends StatefulWidget {
 }
 
 class _OrdersScreenState extends State<OrdersScreen> {
-  OrderStatus _selectedStatus = OrderStatus.inProgress; // ✅ Default = Active (in progress + completed)
+  late String _selectedStatus; // 'pending', 'inProgress', 'completed'
 
-  List<Order> _getFilteredOrders() {
+  @override
+  void initState() {
+    super.initState();
+    _selectedStatus = 'inProgress'; // Default filter
+
+    // Fetch orders when screen loads
+    _fetchOrders();
+  }
+
+  void _fetchOrders() {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthSuccess) {
+      // Fetch pending orders for this tailor
+      context.read<OrderCubit>().fetchPendingOrderDetailsForTailor(
+        authState.tailor.tailor_id,
+      );
+    }
+  }
+
+  List<OrderDetail> _getFilteredOrders(List<OrderDetail> orders) {
     switch (_selectedStatus) {
-      case OrderStatus.pending:
-        return mockOrders.where((o) => o.status == OrderStatus.pending).toList();
-
-      case OrderStatus.inProgress:
-        return mockOrders.where((o) => o.status == OrderStatus.inProgress).toList();
-
-      case OrderStatus.completed:
-        return mockOrders.where((o) => o.status == OrderStatus.completed).toList();
+      case 'pending':
+        return orders.where((o) => o.status == -1).toList();
+      case 'inProgress':
+        return orders.where((o) => o.status == 0 || o.status == 1).toList();
+      case 'completed':
+        return orders.where((o) => o.status == 2).toList();
+      default:
+        return orders;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final filteredOrders = _getFilteredOrders();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Orders'),
+        automaticallyImplyLeading: false,
         actions: const [
           Icon(Icons.settings_outlined),
           SizedBox(width: 12),
         ],
       ),
-
-      body: Column(
-        children: [
-          // 🔍 Search Bar
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search orders...',
-                prefixIcon: const Icon(Icons.search),
+      body: BlocConsumer<OrderCubit, OrderState>(
+        listener: (context, state) {
+          if (state is OrderError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: Colors.red,
               ),
-            ),
-          ),
+            );
+          }
+        },
+        builder: (context, state) {
+          if (state is OrderLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-          // ✅ Filter Tabs
-          _buildFilterTabs(context),
+          List<OrderDetail> allOrders = [];
+          if (state is OrderDetailsSuccess) {
+            allOrders = state.orderDetails;
+          }
 
-          // ✅ Order Count
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Total: ${filteredOrders.length}',
-                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                  fontWeight: FontWeight.w600,
+          final filteredOrders = _getFilteredOrders(allOrders);
+
+          return Column(
+            children: [
+              // Search Bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Search orders...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
                 ),
               ),
-            ),
-          ),
 
-          // ✅ Orders List
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: filteredOrders.length,
-              itemBuilder: (context, index) =>
-                  OrderListItem(
-                    order: filteredOrders[index],
-                    showActions: filteredOrders[index].status == OrderStatus.pending,
+              // Filter Chips
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _FilterChip(
+                        label: 'Pending',
+                        isSelected: _selectedStatus == 'pending',
+                        onPressed: () => setState(() => _selectedStatus = 'pending'),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'In Progress',
+                        isSelected: _selectedStatus == 'inProgress',
+                        onPressed: () => setState(() => _selectedStatus = 'inProgress'),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'Completed',
+                        isSelected: _selectedStatus == 'completed',
+                        onPressed: () => setState(() => _selectedStatus = 'completed'),
+                      ),
+                    ],
                   ),
-            ),
-          ),
-        ],
-      ),
+                ),
+              ),
 
-      bottomNavigationBar: const CustomBottomNavBar(activeIndex: 3),
-    );
-  }
-
-  Widget _buildFilterTabs(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 16, top: 4, bottom: 8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            _TabButton(
-              label: 'Pending',
-              status: OrderStatus.pending,
-              isSelected: _selectedStatus == OrderStatus.pending,
-              onPressed: () => setState(() => _selectedStatus = OrderStatus.pending),
-            ),
-            _TabButton(
-              label: 'In Progress',
-              status: OrderStatus.inProgress,
-              isSelected: _selectedStatus == OrderStatus.inProgress,
-              onPressed: () => setState(() => _selectedStatus = OrderStatus.inProgress),
-            ),
-            _TabButton(
-              label: 'Completed',
-              status: OrderStatus.completed,
-              isSelected: _selectedStatus == OrderStatus.completed,
-              onPressed: () => setState(() => _selectedStatus = OrderStatus.completed),
-            ),
-          ],
-        ),
+              // Orders List
+              Expanded(
+                child: filteredOrders.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.shopping_bag_outlined,
+                              size: 80,
+                              color: AppColors.textGrey,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No orders found',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: filteredOrders.length,
+                        itemBuilder: (context, index) {
+                          return OrderListItem(
+                            orderDetail: filteredOrders[index],
+                            showActions: filteredOrders[index].status == -1,
+                          );
+                        },
+                      ),
+              ),
+            ],
+          );
+        },
       ),
+      bottomNavigationBar: const CustomBottomNavBar(activeIndex: 0),
     );
   }
 }
 
-// 📌 Tab Button Component
-class _TabButton extends StatelessWidget {
+// Filter Chip Widget
+class _FilterChip extends StatelessWidget {
   final String label;
-  final OrderStatus status;
   final bool isSelected;
   final VoidCallback onPressed;
 
-  const _TabButton({
+  const _FilterChip({
     required this.label,
-    required this.status,
     required this.isSelected,
     required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor:
-          isSelected ? AppColors.caramel : AppColors.outline,
-          foregroundColor:
-          isSelected ? Colors.white : AppColors.textBlack,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: isSelected
-                ? BorderSide.none
-                : const BorderSide(color: AppColors.outline),
-          ),
-          textStyle: theme.textTheme.bodyMedium!.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        child: Text(label),
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) => onPressed(),
+      selectedColor: AppColors.caramel,
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : AppColors.textBlack,
+        fontWeight: FontWeight.w500,
       ),
     );
   }
 }
 
-// ✅ Order Item UI
+// Order List Item Widget
 class OrderListItem extends StatelessWidget {
-  final Order order;
+  final OrderDetail orderDetail;
   final bool showActions;
 
   const OrderListItem({
-    super.key,
-    required this.order,
-    this.showActions = false,
+    required this.orderDetail,
+    required this.showActions,
   });
 
-  Color _statusColor() {
-    switch (order.status) {
-      case OrderStatus.completed:
-        return AppColors.success;
-      case OrderStatus.inProgress:
-        return AppColors.caramel;
+  String _getStatusLabel() {
+    switch (orderDetail.status) {
+      case -1:
+        return 'Pending';
+      case 0:
+        return 'Accepted';
+      case 1:
+        return 'In Progress';
+      case 2:
+        return 'Completed';
       default:
-        return AppColors.textGrey;
+        return 'Unknown';
     }
   }
 
-  String _statusText() {
-    return order.status == OrderStatus.completed ? 'Completed' : 'In Progress';
+  Color _getStatusColor() {
+    switch (orderDetail.status) {
+      case -1:
+        return Colors.orange;
+      case 0:
+        return Colors.blue;
+      case 1:
+        return Colors.purple;
+      case 2:
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = _statusColor();
-
-    return Container(
+    return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.outline),
-      ),
-      child: Column(
-        children: [
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with status badge
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(order.id, style: Theme.of(context).textTheme.bodyMedium),
-                const SizedBox(height: 2),
-                Text(order.title,
-                  style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text('Client: ${order.client}'),
-              ],
-            ),
-            trailing: Text(
-              order.price,
-              style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.deepBrown,
-              ),
-            ),
-            subtitle: Row(
-              children: [
-                Text(
-                  _statusText(),
-                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-                if (order.status != OrderStatus.completed)
-                  Text(
-                    order.daysLeft,
-                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          if (showActions)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      child: const Text('Accept'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.error,
-                        side: const BorderSide(color: AppColors.error),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        orderDetail.customerName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      child: const Text('Reject'),
+                      const SizedBox(height: 4),
+                      Text(
+                        orderDetail.orderId,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textGrey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _getStatusLabel(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-        ],
+            const SizedBox(height: 12),
+
+            // Description
+            Text(
+              orderDetail.description,
+              style: const TextStyle(fontSize: 14),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 12),
+
+            // Price and Payment Status
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Price: Rs. ${orderDetail.totalPrice}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.caramel,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Payment: ${orderDetail.paymentStatus}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: orderDetail.paymentStatus == 'Pending'
+                            ? Colors.orange
+                            : Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+                if (showActions)
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.caramel,
+                    ),
+                    onPressed: () {
+                      // Update order status to accepted
+                      context.read<OrderCubit>().updateOrderDetailStatus(
+                        detailsId: orderDetail.detailsId,
+                        newStatus: 0, // Mark as accepted
+                      );
+                    },
+                    child: const Text(
+                      'Accept',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

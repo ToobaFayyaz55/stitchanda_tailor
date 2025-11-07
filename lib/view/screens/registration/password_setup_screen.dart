@@ -1,36 +1,11 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:stichanda_tailor/controller/auth_cubit.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import '../login_screen.dart';
 
 class PasswordSetupScreen extends StatefulWidget {
-  final String fullName;
-  final String email;
-  final String phone;
-  final String gender;
-  final String address;
-  final String workDescription;
-  final String experience;
-  final List<String> specialties;
-  final File cnicFront;
-  final File cnicBack;
-
-  const PasswordSetupScreen({
-    super.key,
-    required this.fullName,
-    required this.email,
-    required this.phone,
-    required this.gender,
-    required this.address,
-    required this.workDescription,
-    required this.experience,
-    required this.specialties,
-    required this.cnicFront,
-    required this.cnicBack,
-  });
+  const PasswordSetupScreen({super.key});
 
   @override
   State<PasswordSetupScreen> createState() => _PasswordSetupScreenState();
@@ -39,190 +14,223 @@ class PasswordSetupScreen extends StatefulWidget {
 class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
   bool obscure = true;
   bool obscureConfirm = true;
-  bool isLoading = false;
+  final _formKey = GlobalKey<FormState>();
+  final passwordController = TextEditingController();
+  final confirmPasswordController = TextEditingController();
 
-  final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmController = TextEditingController();
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-
-  final FirebaseAuth auth = FirebaseAuth.instance;
-  final FirebaseFirestore firestore = FirebaseFirestore.instance;
-  final FirebaseStorage storage = FirebaseStorage.instance;
-
-  Future<void> _register() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => isLoading = true);
-
-    try {
-      // Auth Create
-      var cred = await auth.createUserWithEmailAndPassword(
-        email: widget.email,
-        password: passwordController.text,
-      );
-      String uid = cred.user!.uid;
-
-      // Upload CNIC
-      var frontRef = storage.ref("tailors/$uid/front.jpg");
-      var backRef = storage.ref("tailors/$uid/back.jpg");
-
-      await frontRef.putFile(widget.cnicFront);
-      await backRef.putFile(widget.cnicBack);
-
-      String frontUrl = await frontRef.getDownloadURL();
-      String backUrl = await backRef.getDownloadURL();
-
-      // Firestore
-      await firestore.collection("tailors").doc(uid).set({
-        "fullName": widget.fullName,
-        "email": widget.email,
-        "phone": widget.phone,
-        "gender": widget.gender,
-        "address": widget.address,
-        "workDescription": widget.workDescription,
-        "experience": widget.experience,
-        "specialties": widget.specialties,
-        "frontCnic": frontUrl,
-        "backCnic": backUrl,
-        "createdAt": DateTime.now(),
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Account Created 🎉")),
-      );
-
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-            (route) => false,
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("$e")));
-    } finally {
-      setState(() => isLoading = false);
-    }
+  @override
+  void dispose() {
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
   }
 
-  Widget _passwordRule(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          const Icon(Icons.check, size: 18, color: AppColors.success),
-          const SizedBox(width: 8),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: AppColors.deepBrown,
-            ),
-          ),
-        ],
-      ),
+  void _handleRegistration(BuildContext context) {
+    if (!_formKey.currentState!.validate()) return;
+
+    // Call the auth cubit with password for final registration
+    context.read<AuthCubit>().completeRegistration(
+      passwordController.text,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text("Create Password"),
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.deepBrown,
+        title: const Text("Set Password"),
+        backgroundColor: AppColors.caramel,
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: SingleChildScrollView(
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Secure your account",
-                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                      color: AppColors.deepBrown.withOpacity(0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-
-                  TextFormField(
-                    controller: passwordController,
-                    obscureText: obscure,
-                    decoration: InputDecoration(
-                      labelText: "Password",
-                      prefixIcon: const Icon(Icons.lock_outline,
-                          color: AppColors.deepBrown),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          obscure ? Icons.visibility_off : Icons.visibility,
-                          color: AppColors.deepBrown,
+        child: BlocConsumer<AuthCubit, AuthState>(
+          listener: (context, state) {
+            if (state is AuthSuccess) {
+              // Registration successful, show success message
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Registration successful! Please login.'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+              // Navigate to login
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
+              );
+            } else if (state is AuthError) {
+              // Show error dialog with clear options
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (state.message.contains('already registered') ||
+                    state.message.contains('email-already-in-use') ||
+                    state.message.contains('already in use')) {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Email Already Registered'),
+                      content: const Text(
+                        'This email has already been registered in the system. '
+                        'Please go back and use a different email address.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context); // Close dialog
+                            // Clear the registration and go back to personal info
+                            context.read<AuthCubit>().clearRegistrationData();
+                            Navigator.popUntil(
+                              context,
+                              (route) => route.isFirst,
+                            );
+                          },
+                          child: const Text('Go Back & Use Different Email'),
                         ),
-                        onPressed: () => setState(() => obscure = !obscure),
+                      ],
+                    ),
+                  );
+                } else {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Registration Failed'),
+                      content: Text(state.message),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.pop(context);
+                          },
+                          child: const Text('Go Back'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+              });
+            }
+          },
+          builder: (context, state) {
+            bool isLoading = state is AuthLoading;
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Set Your Password",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.deepBrown,
                       ),
                     ),
-                    validator: (val) =>
-                    val != null && val.length >= 6
-                        ? null
-                        : "Min 6 characters",
-                  ),
-                  const SizedBox(height: 18),
-
-                  TextFormField(
-                    controller: confirmController,
-                    obscureText: obscureConfirm,
-                    decoration: InputDecoration(
-                      labelText: "Confirm Password",
-                      prefixIcon: const Icon(Icons.lock_outline,
-                          color: AppColors.deepBrown),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          obscureConfirm
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                          color: AppColors.deepBrown,
-                        ),
-                        onPressed: () =>
-                            setState(() => obscureConfirm = !obscureConfirm),
+                    const SizedBox(height: 10),
+                    const Text(
+                      "Create a strong password to secure your account",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textGrey,
                       ),
                     ),
-                    validator: (val) =>
-                    val == passwordController.text
-                        ? null
-                        : "Passwords do not match",
-                  ),
+                    const SizedBox(height: 30),
 
-                  const SizedBox(height: 25),
-                  const Text(
-                    "Password requirements:",
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.deepBrown,
+                    /// Password Field
+                    TextFormField(
+                      controller: passwordController,
+                      obscureText: obscure,
+                      decoration: InputDecoration(
+                        labelText: "Password",
+                        hintText: "Enter your password",
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () => setState(() => obscure = !obscure),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Password is required';
+                        }
+                        if (value.length < 6) {
+                          return 'Password must be at least 6 characters';
+                        }
+                        return null;
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  _passwordRule("At least 6 characters"),
-                  _passwordRule("Letters & numbers included"),
-                  _passwordRule("At least 1 special character"),
+                    const SizedBox(height: 16),
 
-                  const SizedBox(height: 40),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: isLoading ? null : _register,
-                      child: isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text("Sign Up"),
+                    /// Confirm Password Field
+                    TextFormField(
+                      controller: confirmPasswordController,
+                      obscureText: obscureConfirm,
+                      decoration: InputDecoration(
+                        labelText: "Confirm Password",
+                        hintText: "Re-enter your password",
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () => setState(() => obscureConfirm = !obscureConfirm),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please confirm your password';
+                        }
+                        if (value != passwordController.text) {
+                          return 'Passwords do not match';
+                        }
+                        return null;
+                      },
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 30),
+
+                    /// Register Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : () => _handleRegistration(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.caramel,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Text(
+                                "Complete Registration",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import 'package:stichanda_tailor/view/base/custom_bottom_nav_bar.dart';
 import 'package:stichanda_tailor/view/screens/profile_details_screen.dart';
-import 'package:stichanda_tailor/data/models/tailor_dummy.dart';
+import 'package:stichanda_tailor/controller/auth_cubit.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -15,68 +16,93 @@ class ProfileScreen extends StatelessWidget {
         title: const Text('Profile'),
         automaticallyImplyLeading: false,
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              const _ProfileSummaryCard(),
-              const SizedBox(height: 20),
-
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.outline),
-                ),
+      body: BlocBuilder<AuthCubit, AuthState>(
+        builder: (context, state) {
+          if (state is AuthSuccess) {
+            return SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    _ProfileMenuItem(
-                      icon: Icons.person_outline,
-                      label: 'Profile Details',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const ProfileDetailsScreen(),
+                    _ProfileSummaryCard(tailor: state.tailor),
+                    const SizedBox(height: 20),
+
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.outline),
+                      ),
+                      child: Column(
+                        children: [
+                          _ProfileMenuItem(
+                            icon: Icons.person_outline,
+                            label: 'Profile Details',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ProfileDetailsScreen(),
+                                ),
+                              );
+                            },
                           ),
-                        );
-                      },
+                          _ProfileMenuItem(
+                            icon: Icons.settings_outlined,
+                            label: 'Settings',
+                            onTap: () {},
+                          ),
+                          _ProfileMenuItem(
+                            icon: Icons.description_outlined,
+                            label: 'Terms & Conditions',
+                            onTap: () {},
+                          ),
+                        ],
+                      ),
                     ),
-                    _ProfileMenuItem(
-                      icon: Icons.settings_outlined,
-                      label: 'Settings',
-                      onTap: () {},
-                    ),
-                    _ProfileMenuItem(
-                      icon: Icons.description_outlined,
-                      label: 'Terms & Conditions',
-                      onTap: () {},
+
+                    const SizedBox(height: 16),
+
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.outline),
+                      ),
+                      child: _ProfileMenuItem(
+                        icon: Icons.logout,
+                        label: 'Logout',
+                        isDestructive: true,
+                        onTap: () {
+                          context.read<AuthCubit>().logout();
+                          Navigator.pushReplacementNamed(context, '/login');
+                        },
+                      ),
                     ),
                   ],
                 ),
               ),
-
-              const SizedBox(height: 16),
-
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.outline),
-                ),
-                child: _ProfileMenuItem(
-                  icon: Icons.logout,
-                  label: 'Logout',
-                  isDestructive: true,
-                  onTap: () {
-                    debugPrint("Logout pressed");
-                  },
-                ),
+            );
+          } else if (state is AuthLoading) {
+            return const Center(child: CircularProgressIndicator());
+          } else {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 64, color: AppColors.error),
+                  const SizedBox(height: 16),
+                  const Text('Unable to load profile'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+                    child: const Text('Go to Login'),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
+            );
+          }
+        },
       ),
 
       // ✅ Profile Tab Active
@@ -85,9 +111,11 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
-// ✅ Profile Summary With Dummy Data
+// ✅ Profile Summary With Real Firebase Data
 class _ProfileSummaryCard extends StatelessWidget {
-  const _ProfileSummaryCard();
+  final dynamic tailor;
+
+  const _ProfileSummaryCard({required this.tailor});
 
   @override
   Widget build(BuildContext context) {
@@ -107,18 +135,18 @@ class _ProfileSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          /// ✅ Tailor name from dummy model
+          /// ✅ Tailor name from Firebase
           Text(
-            currentTailor.name,
+            tailor.name,
             style: Theme.of(context).textTheme.titleLarge!.copyWith(
               color: AppColors.textBlack,
               fontWeight: FontWeight.w600,
             ),
           ),
 
-          /// ✅ Tailor role (Tailor)
+          /// ✅ Tailor verification status
           Text(
-            currentTailor.role,
+            tailor.verfication_status ?? 'Not verified',
             style: Theme.of(context).textTheme.bodyMedium!.copyWith(
               color: AppColors.textGrey,
             ),
@@ -126,18 +154,18 @@ class _ProfileSummaryCard extends StatelessWidget {
 
           const SizedBox(height: 14),
 
-          /// ✅ Phone from dummy model
+          /// ✅ Phone from Firebase
           _ContactRow(
             icon: Icons.phone_outlined,
             label: 'Phone',
-            value: currentTailor.phone,
+            value: tailor.phone,
           ),
 
-          /// ✅ Email from dummy model
+          /// ✅ Email from Firebase
           _ContactRow(
             icon: Icons.mail_outline,
             label: 'Email',
-            value: currentTailor.email,
+            value: tailor.email,
           ),
         ],
       ),
@@ -212,3 +240,4 @@ class _ProfileMenuItem extends StatelessWidget {
     );
   }
 }
+

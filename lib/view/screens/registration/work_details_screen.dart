@@ -1,22 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:stichanda_tailor/controller/auth_cubit.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import 'cnic_upload_screen.dart';
 
 class WorkDetailsScreen extends StatefulWidget {
-  final String fullName;
-  final String email;
-  final String phone;
-  final String gender;
-  final String address;
-
-  const WorkDetailsScreen({
-    super.key,
-    required this.fullName,
-    required this.email,
-    required this.phone,
-    required this.gender,
-    required this.address,
-  });
+  const WorkDetailsScreen({super.key});
 
   @override
   State<WorkDetailsScreen> createState() => _WorkDetailsScreenState();
@@ -24,20 +13,18 @@ class WorkDetailsScreen extends StatefulWidget {
 
 class _WorkDetailsScreenState extends State<WorkDetailsScreen> {
   final _formKey = GlobalKey<FormState>();
-  final workDescController = TextEditingController();
   String? selectedExperience;
-
-  // we’ll keep track of the selected specialties here
   List<String> selectedSpecialties = [];
 
   final List<String> experienceOptions = [
-    "Less than 1 year",
-    "1 - 3 years",
-    "3 - 5 years",
-    "5+ years"
+    "1",
+    "2",
+    "3",
+    "4",
+    "5+"
   ];
 
-  final List<String> specializationOptions = ["Kids", "Men", "Women"];
+  final List<String> specializationOptions = ["male", "female", "both"];
 
   @override
   Widget build(BuildContext context) {
@@ -64,35 +51,18 @@ class _WorkDetailsScreenState extends State<WorkDetailsScreen> {
                 ),
                 const SizedBox(height: 25),
 
-                // Work Description
-                TextFormField(
-                  controller: workDescController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: "Describe your work or skills",
-                    alignLabelWithHint: true,
-                    prefixIcon: Icon(Icons.description_outlined),
-                  ),
-                  validator: (v) => v!.isEmpty
-                      ? "Please write something about your work"
-                      : null,
-                ),
-                const SizedBox(height: 20),
-
                 // Years of Experience dropdown
                 DropdownButtonFormField<String>(
                   decoration: const InputDecoration(
                     labelText: "Years of Experience",
                     prefixIcon: Icon(Icons.timeline_outlined),
                   ),
-                  value: selectedExperience,
+                  initialValue: selectedExperience,
                   items: experienceOptions
-                      .map(
-                        (exp) => DropdownMenuItem(
-                      value: exp,
-                      child: Text(exp),
-                    ),
-                  )
+                      .map((exp) => DropdownMenuItem(
+                            value: exp,
+                            child: Text("$exp years"),
+                          ))
                       .toList(),
                   onChanged: (value) {
                     setState(() {
@@ -100,7 +70,7 @@ class _WorkDetailsScreenState extends State<WorkDetailsScreen> {
                     });
                   },
                   validator: (v) =>
-                  v == null ? "Please select your experience" : null,
+                      v == null ? "Please select your experience" : null,
                 ),
                 const SizedBox(height: 25),
 
@@ -143,36 +113,44 @@ class _WorkDetailsScreenState extends State<WorkDetailsScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.caramel,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
                     onPressed: () {
                       if (_formKey.currentState!.validate()) {
                         if (selectedSpecialties.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content:
-                              Text("Please select at least one specialty"),
+                              content: Text("Please select at least one specialty"),
                             ),
                           );
                           return;
                         }
 
+                        // Save work details to AuthCubit
+                        context.read<AuthCubit>().updateWorkDetails(
+                          categories: selectedSpecialties,
+                          experience: int.parse(selectedExperience!.replaceAll('+', '')),
+                        );
+
+                        // Navigate to next screen
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => CnicUploadScreen(
-                              fullName: widget.fullName,
-                              email: widget.email,
-                              phone: widget.phone,
-                              gender: widget.gender,
-                              address: widget.address,
-                              workDescription: workDescController.text.trim(),
-                              experience: selectedExperience!,
-                              specialties: selectedSpecialties,
-                            ),
+                            builder: (context) => const CnicUploadScreen(),
                           ),
                         );
                       }
                     },
-                    child: const Text("Continue"),
+                    child: const Text(
+                      "Continue",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -183,3 +161,4 @@ class _WorkDetailsScreenState extends State<WorkDetailsScreen> {
     );
   }
 }
+

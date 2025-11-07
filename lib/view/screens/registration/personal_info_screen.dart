@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:stichanda_tailor/controller/auth_cubit.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import 'work_details_screen.dart';
 
@@ -17,7 +19,16 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   final phoneController = TextEditingController();
   final addressController = TextEditingController();
 
-  String gender = "Male"; // default selected
+  String gender = "male"; // default selected
+
+  @override
+  void dispose() {
+    fullNameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    addressController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,34 +106,42 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: RadioListTile(
-                        activeColor: AppColors.caramel,
-                        title: const Text("Male"),
-                        value: "Male",
-                        groupValue: gender,
-                        onChanged: (value) {
-                          setState(() {
-                            gender = value.toString();
-                          });
-                        },
+                      child: Row(
+                        children: [
+                          Radio<String>(
+                            activeColor: AppColors.caramel,
+                            value: "male",
+                            groupValue: gender,
+                            onChanged: (value) {
+                              setState(() {
+                                gender = value ?? "male";
+                              });
+                            },
+                          ),
+                          const Text("Male"),
+                        ],
                       ),
                     ),
                     Expanded(
-                      child: RadioListTile(
-                        activeColor: AppColors.caramel,
-                        title: const Text("Female"),
-                        value: "Female",
-                        groupValue: gender,
-                        onChanged: (value) {
-                          setState(() {
-                            gender = value.toString();
-                          });
-                        },
+                      child: Row(
+                        children: [
+                          Radio<String>(
+                            activeColor: AppColors.caramel,
+                            value: "female",
+                            groupValue: gender,
+                            onChanged: (value) {
+                              setState(() {
+                                gender = value ?? "male";
+                              });
+                            },
+                          ),
+                          const Text("Female"),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 15),
 
                 // Address
                 TextFormField(
@@ -141,23 +160,38 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.caramel,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
                     onPressed: () {
                       if (_formKey.currentState!.validate()) {
+                        // Save personal info to AuthCubit
+                        context.read<AuthCubit>().updatePersonalInfo(
+                          name: fullNameController.text.trim(),
+                          email: emailController.text.trim(),
+                          phone: phoneController.text.trim(),
+                          fullAddress: addressController.text.trim(),
+                          gender: gender,
+                        );
+
+                        // Navigate to next screen
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => WorkDetailsScreen(
-                              fullName: fullNameController.text.trim(),
-                              email: emailController.text.trim(),
-                              phone: phoneController.text.trim(),
-                              gender: gender,
-                              address: addressController.text.trim(),
-                            ),
+                            builder: (context) => const WorkDetailsScreen(),
                           ),
                         );
                       }
                     },
-                    child: const Text("Continue"),
+                    child: const Text(
+                      "Continue",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -168,3 +202,4 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     );
   }
 }
+
