@@ -9,6 +9,54 @@ class AuthRepo {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
+  /// Update tailor availability status and return updated Tailor
+  Future<Tailor> updateAvailability(String tailorId, bool available) async {
+    try {
+      final docRef = _firestore.collection('tailor').doc(tailorId);
+      await docRef.update({
+        'availibility_status': available,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      final doc = await docRef.get();
+      if (!doc.exists) throw Exception('Tailor not found');
+
+      return Tailor.fromMap({
+        ...doc.data() as Map<String, dynamic>,
+        'tailor_id': tailorId,
+      });
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Upload and set tailor profile image. Accepts a local file path.
+  Future<Tailor> uploadProfileImage(String tailorId, String filePath) async {
+    try {
+      // Upload to Firebase Storage
+      final ref = _storage.ref().child('tailor_profile/$tailorId/avatar.jpg');
+      await ref.putFile(File(filePath));
+      final imageUrl = await ref.getDownloadURL();
+
+      // Update Firestore document
+      final docRef = _firestore.collection('tailor').doc(tailorId);
+      await docRef.update({
+        'image_path': imageUrl,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      final doc = await docRef.get();
+      if (!doc.exists) throw Exception('Tailor not found');
+
+      return Tailor.fromMap({
+        ...doc.data() as Map<String, dynamic>,
+        'tailor_id': tailorId,
+      });
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   /// Register a new tailor with email and password
   Future<Tailor> registerTailor({
     required String name,
@@ -96,6 +144,28 @@ class AuthRepo {
     }
   }
 
+  /// Update tailor profile fields and return updated Tailor
+  Future<Tailor> updateTailorProfile(String tailorId, Map<String, dynamic> updatedData) async {
+    try {
+      final docRef = _firestore.collection('tailor').doc(tailorId);
+
+      // Add updated_at timestamp
+      updatedData['updated_at'] = FieldValue.serverTimestamp();
+
+      await docRef.update(updatedData);
+
+      final doc = await docRef.get();
+      if (!doc.exists) throw Exception('Tailor not found');
+
+      return Tailor.fromMap({
+        ...doc.data() as Map<String, dynamic>,
+        'tailor_id': tailorId,
+      });
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   /// Login with email and password
   Future<Tailor> login(String email, String password) async {
     try {
@@ -140,4 +210,3 @@ class AuthRepo {
     return _firebaseAuth.currentUser != null;
   }
 }
-

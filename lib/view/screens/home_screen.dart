@@ -4,6 +4,8 @@ import 'package:stichanda_tailor/controller/order_cubit.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
 import 'package:stichanda_tailor/data/models/order_detail_model.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
+import '../base/custom_bottom_nav_bar.dart';
+import 'orders_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -29,121 +31,344 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Orders Dashboard'),
+        title: const Text('Home Screen', style: TextStyle(color: AppColors.textBlack)),
         backgroundColor: AppColors.caramel,
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout, color: Colors.red),
             onPressed: () {
-              context.read<AuthCubit>().logout();
-              Navigator.pushReplacementNamed(context, '/login');
+              showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Confirm Logout'),
+                  content: const Text('Are you sure you want to logout?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: const Text('Cancel'),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8.0),
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        child: const Text('Logout'),
+                      ),
+                    ),
+                  ],
+                ),
+              ).then((confirmed) async {
+                if (confirmed == true) {
+                  await context.read<AuthCubit>().logout();
+                  if (mounted) {
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      '/login',
+                      (Route<dynamic> route) => false,
+                    );
+                  }
+                }
+              });
             },
           ),
         ],
       ),
-      body: BlocConsumer<OrderCubit, OrderState>(
-        listener: (context, state) {
-          if (state is OrderError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        },
-        builder: (context, state) {
-          if (state is OrderLoading) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          } else if (state is OrderDetailsSuccess) {
-            if (state.orderDetails.isEmpty) {
-              return Center(
+      body: SafeArea(
+        child: BlocListener<AuthCubit, AuthState>(
+          listener: (context, authState) {
+            if (authState is AuthError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(authState.message), backgroundColor: Colors.red),
+              );
+            }
+          },
+          child: BlocConsumer<OrderCubit, OrderState>(
+            listener: (context, state) {
+              if (state is OrderError) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(state.message),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            builder: (context, state) {
+              final authState = context.watch<AuthCubit>().state;
+
+              // prepare metrics based on order data
+              List<OrderDetail> allOrders = [];
+              if (state is OrderDetailsSuccess) {
+                allOrders = state.orderDetails;
+              }
+
+              final activeOrders = allOrders.where((o) => o.status == -1).length;
+              final completedOrders = allOrders.where((o) => o.status == 2).length;
+              final avgRating = (authState is AuthSuccess) ? authState.tailor.review.toDouble() : 0.0;
+              final earnings = allOrders.fold<double>(0.0, (sum, o) => sum + (o.totalPrice));
+
+              if (state is OrderLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
-                      Icons.shopping_bag_outlined,
-                      size: 80,
-                      color: AppColors.textGrey,
+                    // Header with avatar + availability (arranged to match screenshot)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.outline, width: 2),
+                          ),
+                          child: const CircleAvatar(
+                            radius: 28,
+                            backgroundImage: AssetImage('assets/images/logo2.png'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                (authState is AuthSuccess) ? authState.tailor.name : 'Tailor',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  const Icon(Icons.verified, color: Colors.green, size: 14),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    (authState is AuthSuccess && authState.tailor.verfication_status.isNotEmpty)
+                                        ? authState.tailor.verfication_status
+                                        : 'unverified',
+                                    style: const TextStyle(fontSize: 12, color: AppColors.textGrey),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Icon(Icons.star, color: Colors.amber, size: 14),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    avgRating.toStringAsFixed(1),
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Availability toggle (aligned top-right)
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            const Text('Available', style: TextStyle(fontSize: 12)),
+                            const SizedBox(height: 6),
+                            // Show spinner while availability is being updated
+                            if (authState is AuthLoading)
+                              const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                            else
+                              Switch(
+                                value: (authState is AuthSuccess) ? authState.tailor.availibility_status : true,
+                                onChanged: (v) {
+                                  // call cubit to persist availability
+                                  context.read<AuthCubit>().updateAvailability(v);
+                                },
+                                activeThumbColor: AppColors.caramel,
+                                activeTrackColor: const Color.fromRGBO(216, 150, 75, 0.3),
+                              ),
+                          ],
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No Orders Found',
-                      style: Theme.of(context).textTheme.titleLarge,
+
+                    const SizedBox(height: 18),
+
+                    // 4 Stats cards implemented as two rows to avoid overflow on small screens
+                    Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: SizedBox(
+                                // increased height to prevent bottom overflow on tight layouts
+                                height: 86,
+                                child: _StatCard(title: 'Active Orders', value: activeOrders.toString(), accent: AppColors.beige),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: SizedBox(
+                                height: 86,
+                                child: _StatCard(title: 'Completed', value: completedOrders.toString(), accent: AppColors.beige),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: SizedBox(
+                                height: 86,
+                                child: _StatCard(title: 'Avg. Rating', value: avgRating.toStringAsFixed(1), accent: AppColors.beige),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: SizedBox(
+                                height: 86,
+                                child: _StatCard(title: 'Earnings', value: '${earnings.toStringAsFixed(0)} Pkr', accent: AppColors.beige),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
+
+                    const SizedBox(height: 14),
+
+                    // In-progress Orders (show top 3 nearest to deadline)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'In Progress',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            // Push OrdersScreen (orders tab) so user can navigate back
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const OrdersScreen()),
+                            );
+                          },
+                          child: const Text('View All', style: TextStyle(color: AppColors.caramel)),
+                        ),
+                      ],
+                    ),
+
                     const SizedBox(height: 8),
-                    const Text(
-                      'You don\'t have any orders yet',
-                      style: TextStyle(color: AppColors.textGrey),
-                    ),
+
+                    // compute in-progress and nearest-deadline orders
+                    Builder(builder: (context) {
+                      // Filter in-progress statuses (0,1)
+                      final inProgress = allOrders.where((o) => o.status == 0 || o.status == 1).toList();
+
+                      // Sort by dueDate ascending (nulls last)
+                      inProgress.sort((a, b) {
+                        final aDue = a.dueDate ?? DateTime.fromMillisecondsSinceEpoch(8640000000000000);
+                        final bDue = b.dueDate ?? DateTime.fromMillisecondsSinceEpoch(8640000000000000);
+                        return aDue.compareTo(bDue);
+                      });
+
+                      // Take top 3 nearest deadlines
+                      final visibleOrders = inProgress.take(3).toList();
+
+                      if (visibleOrders.isEmpty) {
+                        return Center(
+                          child: Column(
+                            children: const [
+                              SizedBox(height: 20),
+                              Icon(Icons.shopping_bag_outlined, size: 80, color: AppColors.textGrey),
+                              SizedBox(height: 12),
+                              Text('No In-Progress Orders', style: TextStyle(color: AppColors.textGrey)),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        physics: const NeverScrollableScrollPhysics(),
+                        shrinkWrap: true,
+                        itemCount: visibleOrders.length,
+                        itemBuilder: (context, index) {
+                          final od = visibleOrders[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12.0),
+                            child: OrderDetailCard(orderDetail: od),
+                          );
+                        },
+                      );
+                    }),
                   ],
                 ),
               );
-            }
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: state.orderDetails.length,
-              itemBuilder: (context, index) {
-                final orderDetail = state.orderDetails[index];
-                return OrderDetailCard(orderDetail: orderDetail);
-              },
-            );
-          } else if (state is OrderError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    size: 80,
-                    color: Colors.red,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Error loading orders',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    state.message,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      final authState = context.read<AuthCubit>().state;
-                      if (authState is AuthSuccess) {
-                        context.read<OrderCubit>().fetchPendingOrderDetailsForTailor(
-                              authState.tailor.tailor_id,
-                            );
-                      }
-                    },
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return const Center(
-            child: Text('No data'),
-          );
-        },
+            },
+          ),
+        ),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.caramel,
-        onPressed: () {
-          final authState = context.read<AuthCubit>().state;
-          if (authState is AuthSuccess) {
-            context.read<OrderCubit>().fetchPendingOrderDetailsForTailor(
-                  authState.tailor.tailor_id,
-                );
-          }
-        },
-        child: const Icon(Icons.refresh),
+      bottomNavigationBar: const CustomBottomNavBar(activeIndex: 2),
+    );
+  }
+}
+
+// Small stat card widget
+class _StatCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final Color? accent; // used as background color for the card
+
+  const _StatCard({Key? key, required this.title, required this.value, this.accent}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColor = accent ?? AppColors.beige; // card background (beige)
+    final actionColor = AppColors.caramel; // icon box color (caramel)
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color.fromRGBO(216, 150, 75, 0.12)),
+        boxShadow: [
+          BoxShadow(color: const Color.fromRGBO(0, 0, 0, 0.02), blurRadius: 8, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Title + Value
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 13, color: AppColors.textBlack)),
+                const SizedBox(height: 6),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textBlack,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Icon box
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: actionColor,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Center(
+              child: Icon(Icons.bar_chart, color: Colors.white, size: 16),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -259,48 +484,6 @@ class OrderDetailCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Measurements
-            if (orderDetail.measurements != null) ...[
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Measurements',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Chest: ${orderDetail.measurements!.chest}',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                        Text(
-                          'Waist: ${orderDetail.measurements!.waist}',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                        Text(
-                          'Shoulder: ${orderDetail.measurements!.shoulder}',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-
             // Footer with price and payment status
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -349,4 +532,3 @@ class OrderDetailCard extends StatelessWidget {
     );
   }
 }
-

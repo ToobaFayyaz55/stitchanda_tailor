@@ -4,6 +4,7 @@ import 'package:stichanda_tailor/theme/theme.dart';
 import 'package:stichanda_tailor/view/base/custom_bottom_nav_bar.dart';
 import 'package:stichanda_tailor/view/screens/profile_details_screen.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -11,81 +12,273 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: const Text('Profile'),
-        automaticallyImplyLeading: false,
-      ),
+      backgroundColor: AppColors.background,
+      // AppBar replaced with a minimal top spacing because design uses a colored header block
       body: BlocBuilder<AuthCubit, AuthState>(
         builder: (context, state) {
           if (state is AuthSuccess) {
-            return SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    _ProfileSummaryCard(tailor: state.tailor),
-                    const SizedBox(height: 20),
+            final tailor = state.tailor;
 
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.outline),
-                      ),
-                      child: Column(
-                        children: [
-                          _ProfileMenuItem(
-                            icon: Icons.person_outline,
-                            label: 'Profile Details',
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const ProfileDetailsScreen(),
+            // image picker instance
+            final picker = ImagePicker();
+
+            // responsive sizes
+            final mq = MediaQuery.of(context);
+            final isSmall = mq.size.height < 700;
+            final headerHeight = isSmall ? 90.0 : 110.0;
+            final avatarRadius = isSmall ? 34.0 : 40.0;
+
+            return SafeArea(
+              child: Stack(
+                children: [
+                  // scrollable main content
+                  SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        // Top caramel header
+                        Container(
+                          height: headerHeight,
+                          color: AppColors.caramel,
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            tailor.name,
+                            style: const TextStyle(
+                              color: AppColors.textBlack,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+
+                        // spacing to match the overlapping avatar area
+                        SizedBox(height: avatarRadius + 18),
+
+                        // Avatar and summary card (positioned visually over header)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            children: [
+                              // Avatar (displayed above the summary card)
+                              GestureDetector(
+                                onTap: () async {
+                                  final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 75);
+                                  if (picked == null) return;
+                                  final confirmed = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Upload Profile Picture'),
+                                      content: const Text('Do you want to upload the selected image as your profile picture?'),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+                                        ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Upload')),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirmed != true) return;
+                                  await context.read<AuthCubit>().updateProfileImage(picked.path);
+                                },
+                                child: Transform.translate(
+                                  offset: Offset(0, -avatarRadius - 22),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(color: const Color.fromRGBO(0, 0, 0, 0.05), blurRadius: 8, offset: const Offset(0, 3)),
+                                      ],
+                                    ),
+                                    padding: const EdgeInsets.all(4),
+                                    child: CircleAvatar(
+                                      radius: avatarRadius,
+                                      backgroundColor: AppColors.beige,
+                                      backgroundImage: tailor.image_path.isNotEmpty ? NetworkImage(tailor.image_path) : null,
+                                      child: tailor.image_path.isEmpty ? Icon(Icons.person, size: avatarRadius, color: AppColors.deepBrown) : null,
+                                    ),
+                                  ),
                                 ),
-                              );
-                            },
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // Name / role / verification row
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.outline),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                tailor.name,
+                                                style: TextStyle(
+                                                  fontSize: isSmall ? 16 : 18,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors.deepBrown,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                'Tailor',
+                                                style: const TextStyle(fontSize: 13, color: AppColors.textGrey),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+
+                                        // small verification pill
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.background,
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(Icons.verified, size: 14, color: Colors.green),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                tailor.verfication_status,
+                                                style: const TextStyle(fontSize: 12, color: AppColors.textGrey),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+
+                                    const SizedBox(height: 12),
+
+                                    // rating
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.star, color: Colors.amber, size: 16),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          tailor.review.toStringAsFixed(1),
+                                          style: const TextStyle(fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 24),
+
+                              // Contact Card
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.outline),
+                                ),
+                                child: Column(
+                                  children: [
+                                    _ContactRow(icon: Icons.phone_outlined, label: 'Phone', value: tailor.phone),
+                                    const Divider(height: 1),
+                                    _ContactRow(icon: Icons.mail_outline, label: 'Mail', value: tailor.email),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // Menu Card
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.outline),
+                                ),
+                                child: Column(
+                                  children: [
+                                    _ProfileMenuItem(
+                                      icon: Icons.person_outline,
+                                      label: 'Profile Details',
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => const ProfileDetailsScreen()),
+                                        );
+                                      },
+                                    ),
+                                    const Divider(height: 1),
+                                    _ProfileMenuItem(icon: Icons.settings_outlined, label: 'Settings', onTap: () {}),
+                                    const Divider(height: 1),
+                                    _ProfileMenuItem(icon: Icons.description_outlined, label: 'Terms & Conditions', onTap: () {}),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // Logout Card (with confirmation)
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.outline),
+                                ),
+                                child: _ProfileMenuItem(
+                                  icon: Icons.logout,
+                                  label: 'Logout',
+                                  isDestructive: true,
+                                  onTap: () {
+                                    showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Confirm Logout'),
+                                        content: const Text('Are you sure you want to logout?'),
+                                        actions: [
+                                          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+                                          ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Logout')),
+                                        ],
+                                      ),
+                                    ).then((confirmed) {
+                                      if (confirmed == true) {
+                                        context.read<AuthCubit>().logout();
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You have been logged out')));
+                                        Navigator.pushReplacementNamed(context, '/login');
+                                      }
+                                    });
+                                  },
+                                ),
+                              ),
+
+                              const SizedBox(height: 48),
+                            ],
                           ),
-                          _ProfileMenuItem(
-                            icon: Icons.settings_outlined,
-                            label: 'Settings',
-                            onTap: () {},
-                          ),
-                          _ProfileMenuItem(
-                            icon: Icons.description_outlined,
-                            label: 'Terms & Conditions',
-                            onTap: () {},
-                          ),
-                        ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // uploading overlay
+                  if (context.watch<AuthCubit>().state is AuthLoading)
+                    Positioned.fill(
+                      child: Container(
+                        color: const Color.fromRGBO(0, 0, 0, 0.25),
+                        child: const Center(child: CircularProgressIndicator()),
                       ),
                     ),
-
-                    const SizedBox(height: 16),
-
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.outline),
-                      ),
-                      child: _ProfileMenuItem(
-                        icon: Icons.logout,
-                        label: 'Logout',
-                        isDestructive: true,
-                        onTap: () {
-                          context.read<AuthCubit>().logout();
-                          Navigator.pushReplacementNamed(context, '/login');
-                        },
-                      ),
-                    ),
-                  ],
-                ),
+                ],
               ),
             );
           } else if (state is AuthLoading) {
             return const Center(child: CircularProgressIndicator());
-          } else {
+          } else if (state is AuthError) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -95,83 +288,33 @@ class ProfileScreen extends StatelessWidget {
                   const Text('Unable to load profile'),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+                    onPressed: () {
+                      // Retry by navigating back to login
+                      context.read<AuthCubit>().logout();
+                      Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        '/login',
+                        (Route<dynamic> route) => false,
+                      );
+                    },
                     child: const Text('Go to Login'),
                   ),
                 ],
               ),
             );
+          } else {
+            // AuthInitial state
+            return const Center(child: CircularProgressIndicator());
           }
         },
       ),
 
-      // ✅ Profile Tab Active
+      // Profile Tab Active
       bottomNavigationBar: const CustomBottomNavBar(activeIndex: 1),
     );
   }
 }
 
-// ✅ Profile Summary With Real Firebase Data
-class _ProfileSummaryCard extends StatelessWidget {
-  final dynamic tailor;
-
-  const _ProfileSummaryCard({required this.tailor});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.outline),
-      ),
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 45,
-            backgroundColor: AppColors.beige,
-            child: Icon(Icons.person, size: 50, color: AppColors.deepBrown),
-          ),
-          const SizedBox(height: 12),
-
-          /// ✅ Tailor name from Firebase
-          Text(
-            tailor.name,
-            style: Theme.of(context).textTheme.titleLarge!.copyWith(
-              color: AppColors.textBlack,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-
-          /// ✅ Tailor verification status
-          Text(
-            tailor.verfication_status ?? 'Not verified',
-            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: AppColors.textGrey,
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          /// ✅ Phone from Firebase
-          _ContactRow(
-            icon: Icons.phone_outlined,
-            label: 'Phone',
-            value: tailor.phone,
-          ),
-
-          /// ✅ Email from Firebase
-          _ContactRow(
-            icon: Icons.mail_outline,
-            label: 'Email',
-            value: tailor.email,
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _ContactRow extends StatelessWidget {
   final IconData icon;
@@ -187,17 +330,17 @@ class _ContactRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       child: Row(
         children: [
-          Icon(icon, size: 22, color: AppColors.iconGrey),
+          Icon(icon, size: 20, color: AppColors.iconGrey),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              "$label: $value",
+              value,
               style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                color: AppColors.textBlack,
-              ),
+                    color: AppColors.textBlack,
+                  ),
             ),
           ),
         ],
@@ -229,9 +372,9 @@ class _ProfileMenuItem extends StatelessWidget {
       title: Text(
         label,
         style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-          color: color,
-          fontWeight: FontWeight.w500,
-        ),
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
       ),
       trailing: isDestructive
           ? null
@@ -240,4 +383,3 @@ class _ProfileMenuItem extends StatelessWidget {
     );
   }
 }
-

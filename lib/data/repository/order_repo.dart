@@ -8,6 +8,22 @@ class OrderRepo {
   final CollectionReference _orderDetailCollection =
       FirebaseFirestore.instance.collection('orderDetail');
 
+  // Helper to normalize various timestamp representations to DateTime
+  DateTime _toDateTime(Object? value) {
+    if (value == null) return DateTime.fromMillisecondsSinceEpoch(0);
+    if (value is DateTime) return value;
+    if (value is Timestamp) return value.toDate();
+    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (_) {
+        return DateTime.fromMillisecondsSinceEpoch(0);
+      }
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
   // ==================== READ OPERATIONS ====================
 
   /// Get all pending order details for a specific tailor
@@ -25,7 +41,7 @@ class OrderRepo {
           .toList();
 
       // Sort by created_at descending in code instead of using orderBy
-      results.sort((a, b) => (b.createdAt ?? DateTime.now()).compareTo(a.createdAt ?? DateTime.now()));
+      results.sort((a, b) => _toDateTime(b.createdAt).compareTo(_toDateTime(a.createdAt)));
 
       return results;
     } catch (e) {
@@ -82,7 +98,7 @@ class OrderRepo {
           .toList();
 
       // Sort by createdAt descending in code
-      results.sort((a, b) => (b.createdAt ?? DateTime.now()).compareTo(a.createdAt ?? DateTime.now()));
+      results.sort((a, b) => _toDateTime(b.createdAt).compareTo(_toDateTime(a.createdAt)));
 
       return results;
     } catch (e) {
@@ -200,4 +216,3 @@ class OrderRepo {
     }
   }
 }
-

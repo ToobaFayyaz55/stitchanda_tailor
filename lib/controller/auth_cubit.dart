@@ -204,4 +204,48 @@ class AuthCubit extends Cubit<AuthState> {
       emit(AuthError('Failed to delete user: ${e.toString()}'));
     }
   }
+
+  /// Update availability status for current tailor
+  Future<void> updateAvailability(bool available) async {
+    try {
+      final state = this.state;
+      if (state is! AuthSuccess) {
+        throw Exception('Not authenticated');
+      }
+      emit(const AuthLoading());
+      final updated = await authRepo.updateAvailability(state.tailor.tailor_id, available);
+      emit(AuthSuccess(updated));
+    } catch (e) {
+      emit(AuthError('Failed to update availability: ${e.toString()}'));
+    }
+  }
+
+  /// Update tailor profile fields (name, phone, address, gender, experience)
+  Future<void> updateTailorProfile(Map<String, dynamic> updatedData) async {
+    try {
+      final state = this.state;
+      if (state is! AuthSuccess) {
+        throw Exception('Not authenticated');
+      }
+      emit(const AuthLoading());
+      final updated = await authRepo.updateTailorProfile(state.tailor.tailor_id, updatedData);
+      emit(AuthSuccess(updated));
+    } catch (e) {
+      emit(AuthError('Failed to update profile: ${e.toString()}'));
+    }
+  }
+
+  /// Upload and update profile image for current tailor
+  Future<void> updateProfileImage(String localFilePath) async {
+    try {
+      final state = this.state;
+      if (state is! AuthSuccess) throw Exception('Not authenticated');
+      emit(const AuthLoading());
+      final updated = await authRepo.uploadProfileImage(state.tailor.tailor_id, localFilePath);
+      emit(AuthSuccess(updated));
+    } catch (e) {
+      emit(AuthError('Failed to update profile image: ${e.toString()}'));
+    }
+  }
+
 }

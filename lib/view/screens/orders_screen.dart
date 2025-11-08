@@ -163,7 +163,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           );
         },
       ),
-      bottomNavigationBar: const CustomBottomNavBar(activeIndex: 0),
+      bottomNavigationBar: const CustomBottomNavBar(activeIndex: 3),
     );
   }
 }

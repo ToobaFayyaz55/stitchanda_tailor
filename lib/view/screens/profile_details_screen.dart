@@ -9,73 +9,181 @@ class ProfileDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Profile Details'),
+        title: const Text('Profile Details', style: TextStyle(color: AppColors.textBlack)),
         backgroundColor: AppColors.caramel,
+        iconTheme: const IconThemeData(color: AppColors.textBlack),
       ),
       body: BlocBuilder<AuthCubit, AuthState>(
         builder: (context, state) {
           if (state is AuthSuccess) {
             final tailor = state.tailor;
             return SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _DetailHeader(tailor: tailor),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header with avatar and name
+                  Container(
+                    width: double.infinity,
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        _DetailHeader(tailor: tailor),
+                      ],
+                    ),
+                  ),
 
-                    const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Personal Details section
+                        const Text(
+                          'Personal Details',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textBlack,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
 
-                    const Text(
-                      'Personal Details',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textBlack,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+                        // Profile fields from Firebase - EDITABLE fields only
+                        _EditableProfileField(
+                          label: 'Name',
+                          value: tailor.name,
+                          isEditable: true,
+                          onEdit: () => _showEditDialog(context, 'Name', tailor.name, (newValue) {
+                            // Update name in Firebase via AuthCubit
+                            context.read<AuthCubit>().updateTailorProfile({'name': newValue});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Name updated successfully')),
+                            );
+                          }),
+                        ),
+                        _EditableProfileField(
+                          label: 'Email',
+                          value: tailor.email,
+                          isEditable: false,
+                        ),
+                        _EditableProfileField(
+                          label: 'Phone',
+                          value: tailor.phone,
+                          isEditable: true,
+                          onEdit: () => _showEditDialog(context, 'Phone', tailor.phone, (newValue) {
+                            context.read<AuthCubit>().updateTailorProfile({'phone': newValue});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Phone updated successfully')),
+                            );
+                          }),
+                        ),
+                        _EditableProfileField(
+                          label: 'Address',
+                          value: tailor.full_address,
+                          isEditable: true,
+                          onEdit: () => _showEditDialog(context, 'Address', tailor.full_address, (newValue) {
+                            context.read<AuthCubit>().updateTailorProfile({'full_address': newValue});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Address updated successfully')),
+                            );
+                          }),
+                        ),
+                        _EditableProfileField(
+                          label: 'Gender',
+                          value: tailor.gender ?? 'Not specified',
+                          isEditable: true,
+                          onEdit: () => _showEditDialog(context, 'Gender', tailor.gender ?? '', (newValue) {
+                            context.read<AuthCubit>().updateTailorProfile({'gender': newValue});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Gender updated successfully')),
+                            );
+                          }),
+                        ),
+                        _EditableProfileField(
+                          label: 'Experience',
+                          value: '${tailor.experience ?? 0} years',
+                          isEditable: true,
+                          onEdit: () => _showEditDialog(context, 'Experience (years)', '${tailor.experience ?? 0}', (newValue) {
+                            final experience = int.tryParse(newValue) ?? tailor.experience;
+                            context.read<AuthCubit>().updateTailorProfile({'experience': experience});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Experience updated successfully')),
+                            );
+                          }),
+                        ),
 
-                    // Profile fields from Firebase
-                    _EditableProfileField(
-                      label: 'Name',
-                      value: tailor.name,
-                    ),
-                    _EditableProfileField(
-                      label: 'Email',
-                      value: tailor.email,
-                    ),
-                    _EditableProfileField(
-                      label: 'Phone',
-                      value: tailor.phone,
-                    ),
-                    _EditableProfileField(
-                      label: 'Address',
-                      value: tailor.full_address,
-                    ),
-                    _EditableProfileField(
-                      label: 'Gender',
-                      value: tailor.gender ?? 'Not specified',
-                    ),
-                    _EditableProfileField(
-                      label: 'Experience',
-                      value: '${tailor.experience ?? 0} years',
-                    ),
-                    _EditableProfileField(
-                      label: 'Categories',
-                      value: tailor.category.join(', '),
-                    ),
+                        const SizedBox(height: 24),
 
-                    const SizedBox(height: 24),
-                    _SkillsSection(categories: tailor.category),
+                        // Specializations section
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Specializations',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textBlack,
+                              ),
+                            ),
+                            Icon(
+                              Icons.edit_outlined,
+                              size: 20,
+                              color: AppColors.caramel,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (tailor.category.isEmpty)
+                          Text(
+                            'No specializations added yet',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          )
+                        else
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: tailor.category
+                                .map((category) => _SkillChip(skill: category))
+                                .toList(),
+                          ),
 
-                    const SizedBox(height: 24),
-                    _ReviewSection(review: tailor.review),
+                        const SizedBox(height: 24),
 
-                    const SizedBox(height: 40),
-                  ],
-                ),
+                        // Rating section
+                        const Text(
+                          'Rating',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textBlack,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _ReviewSection(review: tailor.review.toInt()),
+
+                        const SizedBox(height: 24),
+
+                        // Gallery section
+                        const Text(
+                          'Gallery',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textBlack,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _GallerySection(),
+
+                        const SizedBox(height: 40),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             );
           } else if (state is AuthLoading) {
@@ -151,10 +259,14 @@ class _DetailHeader extends StatelessWidget {
 class _EditableProfileField extends StatelessWidget {
   final String label;
   final String value;
+  final VoidCallback? onEdit;
+  final bool isEditable;
 
   const _EditableProfileField({
     required this.label,
     required this.value,
+    this.onEdit,
+    this.isEditable = false,
   });
 
   @override
@@ -199,18 +311,22 @@ class _EditableProfileField extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: AppColors.caramel,
-                borderRadius: BorderRadius.circular(8),
+            if (isEditable)
+              GestureDetector(
+                onTap: onEdit,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppColors.caramel,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.edit_outlined,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
               ),
-              child: const Icon(
-                Icons.edit_outlined,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
           ],
         ),
       ),
@@ -218,49 +334,6 @@ class _EditableProfileField extends StatelessWidget {
   }
 }
 
-// Skills Section - Display tailor categories
-class _SkillsSection extends StatelessWidget {
-  final List<String> categories;
-
-  const _SkillsSection({required this.categories});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Specializations',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            Icon(
-              Icons.edit_outlined,
-              size: 20,
-              color: AppColors.iconGrey,
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (categories.isEmpty)
-          Text(
-            'No specializations added yet',
-            style: Theme.of(context).textTheme.bodyMedium,
-          )
-        else
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: categories
-                .map((category) => _SkillChip(skill: category))
-                .toList(),
-          ),
-      ],
-    );
-  }
-}
 
 class _SkillChip extends StatelessWidget {
   final String skill;
@@ -272,10 +345,10 @@ class _SkillChip extends StatelessWidget {
     return Chip(
       label: Text(
         skill,
-        style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: AppColors.deepBrown,
-              fontWeight: FontWeight.w500,
-            ),
+        style: const TextStyle(
+          color: AppColors.deepBrown,
+          fontWeight: FontWeight.w500,
+        ),
       ),
       backgroundColor: AppColors.beige,
       shape: RoundedRectangleBorder(
@@ -294,51 +367,138 @@ class _ReviewSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Rating',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.beige,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.star,
+            color: Colors.amber,
+            size: 24,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$review.0 / 5.0',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppColors.caramel,
+              fontSize: 16,
+            ),
+          ),
+          const Spacer(),
+          Row(
+            children: List.generate(
+              5,
+              (index) => Icon(
+                Icons.star,
+                color: index < review ? Colors.amber : AppColors.outline,
+                size: 16,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Gallery Section - Display tailor's work images
+class _GallerySection extends StatelessWidget {
+  const _GallerySection();
+
+  @override
+  Widget build(BuildContext context) {
+    // Placeholder images - in real app, fetch from Firebase Storage
+    final List<String> galleryPlaceholders = [
+      'assets/images/logo.png',
+      'assets/images/logo2.png',
+      'assets/images/logo.png',
+      'assets/images/logo2.png',
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1,
+      ),
+      itemCount: galleryPlaceholders.length,
+      itemBuilder: (context, index) {
+        return Container(
           decoration: BoxDecoration(
             color: AppColors.beige,
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.outline),
           ),
-          child: Row(
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              const Icon(
-                Icons.star,
-                color: AppColors.gold,
-                size: 24,
+              // Placeholder for image
+              Image.asset(
+                galleryPlaceholders[index],
+                fit: BoxFit.cover,
               ),
-              const SizedBox(width: 8),
-              Text(
-                '$review / 5',
-                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.caramel,
-                    ),
-              ),
-              const Spacer(),
-              Row(
-                children: List.generate(
-                  5,
-                  (index) => Icon(
-                    Icons.star,
-                    color: index < review ? AppColors.gold : AppColors.outline,
-                    size: 16,
-                  ),
+              // Add button overlay
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.add,
+                  color: Colors.white,
+                  size: 32,
                 ),
               ),
             ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
+}
+
+// Helper function to show edit dialog
+void _showEditDialog(
+  BuildContext context,
+  String fieldName,
+  String currentValue,
+  Function(String) onSave,
+) {
+  final TextEditingController controller = TextEditingController(text: currentValue);
+
+  showDialog(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text('Edit $fieldName'),
+      content: TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          hintText: 'Enter $fieldName',
+          border: const OutlineInputBorder(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            onSave(controller.text);
+            Navigator.pop(dialogContext);
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  );
 }
 
