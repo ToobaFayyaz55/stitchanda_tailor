@@ -5,8 +5,10 @@ import 'package:stichanda_tailor/firebase_options.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
 import 'package:stichanda_tailor/controller/order_cubit.dart';
+import 'package:stichanda_tailor/controller/ride_cubit.dart';
 import 'package:stichanda_tailor/data/repository/auth_repo.dart' as auth_repo;
 import 'package:stichanda_tailor/data/repository/order_repo.dart' as order_repo;
+import 'package:stichanda_tailor/data/repository/ride_repo.dart' as ride_repo;
 import 'package:stichanda_tailor/view/screens/login_screen.dart';
 
 void main() async {
@@ -32,6 +34,9 @@ class MyApp extends StatelessWidget {
         ),
         BlocProvider(
           create: (context) => OrderCubit(orderRepo: order_repo.OrderRepo()),
+        ),
+        BlocProvider(
+          create: (context) => RideCubit(rideRepo: ride_repo.RideRepo()),
         ),
       ],
       child: MaterialApp(

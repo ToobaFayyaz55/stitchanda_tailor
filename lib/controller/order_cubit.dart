@@ -238,5 +238,147 @@ class OrderCubit extends Cubit<OrderState> {
       emit(OrderError(e.toString()));
     }
   }
+
+  // ==================== TAILOR WORKFLOW ACTIONS ====================
+
+  /// Tailor action: Receive incoming order
+  /// Status transition: 3 → 4
+  Future<void> tailorReceiveOrder({
+    required String detailsId,
+    required String tailorId,
+  }) async {
+    try {
+      emit(const OrderLoading());
+      await orderRepo.tailorReceiveOrder(
+        detailsId: detailsId,
+        tailorId: tailorId,
+      );
+      // Fetch updated order to reflect new status
+      await getOrderDetailById(detailsId);
+      emit(OrderUpdated(OrderDetail(
+        detailsId: '',
+        orderId: '',
+        tailorId: '',
+        customerId: '',
+        customerName: '',
+        description: '',
+        price: 0,
+        totalPrice: 0,
+        paymentMethod: '',
+        paymentStatus: '',
+        status: OrderRepo.STATUS_RECEIVED_BY_TAILOR,
+      )));
+    } catch (e) {
+      emit(OrderError(e.toString()));
+    }
+  }
+
+  /// Tailor action: Mark stitching as completed
+  /// Status transition: 4 → 5
+  Future<void> tailorMarkCompleted({
+    required String detailsId,
+    required String tailorId,
+  }) async {
+    try {
+      emit(const OrderLoading());
+      await orderRepo.tailorMarkCompleted(
+        detailsId: detailsId,
+        tailorId: tailorId,
+      );
+      // Fetch updated order to reflect new status
+      await getOrderDetailById(detailsId);
+      emit(OrderUpdated(OrderDetail(
+        detailsId: '',
+        orderId: '',
+        tailorId: '',
+        customerId: '',
+        customerName: '',
+        description: '',
+        price: 0,
+        totalPrice: 0,
+        paymentMethod: '',
+        paymentStatus: '',
+        status: OrderRepo.STATUS_TAILOR_COMPLETED,
+      )));
+    } catch (e) {
+      emit(OrderError(e.toString()));
+    }
+  }
+
+  /// Tailor action: Request driver pickup
+  /// Status transition: 5 → 6
+  Future<void> tailorCallDriver({
+    required String detailsId,
+    required String tailorId,
+  }) async {
+    try {
+      emit(const OrderLoading());
+      await orderRepo.tailorCallDriver(
+        detailsId: detailsId,
+        tailorId: tailorId,
+      );
+      // Fetch updated order to reflect new status
+      await getOrderDetailById(detailsId);
+      emit(OrderUpdated(OrderDetail(
+        detailsId: '',
+        orderId: '',
+        tailorId: '',
+        customerId: '',
+        customerName: '',
+        description: '',
+        price: 0,
+        totalPrice: 0,
+        paymentMethod: '',
+        paymentStatus: '',
+        status: OrderRepo.STATUS_DRIVER_REQUESTED,
+      )));
+    } catch (e) {
+      emit(OrderError(e.toString()));
+    }
+  }
+
+  /// Mark order available for customer self-pickup
+  /// Status transition: 5 → 11
+  Future<void> tailorSelfDeliver({
+    required String detailsId,
+    required String tailorId,
+  }) async {
+    try {
+      emit(const OrderLoading());
+      await orderRepo.tailorSelfDeliver(
+        detailsId: detailsId,
+        tailorId: tailorId,
+      );
+      // Fetch updated order to reflect new status
+      await getOrderDetailById(detailsId);
+      emit(OrderUpdated(OrderDetail(
+        detailsId: '',
+        orderId: '',
+        tailorId: '',
+        customerId: '',
+        customerName: '',
+        description: '',
+        price: 0,
+        totalPrice: 0,
+        paymentMethod: '',
+        paymentStatus: '',
+        status: OrderRepo.STATUS_SELF_DELIVERY,
+      )));
+    } catch (e) {
+      emit(OrderError(e.toString()));
+    }
+  }
+
+  // ==================== UI HELPER METHODS ====================
+
+  /// Get button visibility for a given order status
+  static String getButtonVisibility(int status) {
+    return OrderRepo.getButtonVisibility(status);
+  }
+
+  /// Check if tailor can perform actions on this order
+  static bool canTailorActOn(int status) {
+    return OrderRepo.canTailorActOn(status);
+  }
 }
 
