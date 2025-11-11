@@ -19,208 +19,261 @@ class RejectedScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Icon
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.cancel_outlined,
-                  size: 80,
-                  color: Colors.red,
-                ),
-              ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 20),
 
-              const SizedBox(height: 32),
-
-              // Title
-              const Text(
-                'Verification Rejected',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textBlack,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 16),
-
-              // Message
-              Text(
-                'Hello $name,',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textBlack,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 12),
-
-              // Description
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.red.withOpacity(0.2),
+                // Red X Icon - Rejection icon
+                Container(
+                  padding: const EdgeInsets.all(30),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.cancel_outlined,
+                    size: 80,
+                    color: Colors.red[600],
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Your registration could not be verified',
+
+                const SizedBox(height: 40),
+
+                // Title
+                const Text(
+                  'Verification Rejected',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textBlack,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 16),
+
+                // Personalized greeting
+                Text(
+                  'Hello $name,',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textBlack,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 32),
+
+                // Rejection Info Box - Light Pink background
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF0F0), // Light pink
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFFFDDDD), // Lighter pink border
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Your registration could not be verified',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textBlack,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'After reviewing your application and documents, we were unable to verify your information at this time.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textGrey,
+                          height: 1.6,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Common reasons for rejection:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textBlack,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildRejectionReason('Invalid or unclear CNIC image'),
+                      const SizedBox(height: 6),
+                      _buildRejectionReason('Information mismatch'),
+                      const SizedBox(height: 6),
+                      _buildRejectionReason('Incomplete documentation'),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // What you can do section - Light blue background
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0F4FF), // Light blue
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFE0EBFF), // Lighter blue border
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'What you can do?',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textBlack,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildOption(
+                        'Contact Support',
+                        'Reach out to our support team to discuss your application',
+                      ),
+                      const SizedBox(height: 12),
+                      _buildOption(
+                        'Reapply Later',
+                        'You can create a new account with updated information after 30 days',
+                      ),
+                      const SizedBox(height: 12),
+                      _buildOption(
+                        'Appeal',
+                        'Contact our team to appeal this decision with additional documents',
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 48),
+
+                // Contact Support Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.caramel,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Support contact feature coming soon'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Contact Support Team',
                       style: TextStyle(
-                        fontSize: 14,
+                        color: Colors.white,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textBlack,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'After reviewing your application and documents, '
-                      'we were unable to verify your information at this time.\n\n'
-                      'Common reasons for rejection:\n'
-                      '• Invalid or unclear CNIC image\n'
-                      '• Information mismatch\n'
-                      '• Incomplete documentation',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textGrey,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // Next steps
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.blue.withOpacity(0.2),
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'What you can do?',
+
+                const SizedBox(height: 16),
+
+                // Return to Login Button - Outlined
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: const BorderSide(color: AppColors.caramel, width: 1.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () {
+                      context.read<AuthCubit>().logout();
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      );
+                    },
+                    child: const Text(
+                      'Return to Login',
                       style: TextStyle(
-                        fontSize: 14,
+                        color: AppColors.caramel,
+                        fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textBlack,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildOption(
-                      'Contact Support',
-                      'Reach out to our support team to discuss your application',
-                    ),
-                    const SizedBox(height: 10),
-                    _buildOption(
-                      'Reapply Later',
-                      'You can create a new account with updated information after 30 days',
-                    ),
-                    const SizedBox(height: 10),
-                    _buildOption(
-                      'Appeal',
-                      'Contact our team to appeal this decision with additional documents',
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 48),
-
-              // Contact Support Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.caramel,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  onPressed: () {
-                    // TODO: Implement support contact
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Support contact feature coming soon'),
-                      ),
-                    );
-                  },
-                  child: const Text(
-                    'Contact Support Team',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 16),
-
-              // Logout Button
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: AppColors.caramel),
-                  ),
-                  onPressed: () {
-                    context.read<AuthCubit>().logout();
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    );
-                  },
-                  child: const Text(
-                    'Return to Login',
-                    style: TextStyle(
-                      color: AppColors.caramel,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-            ],
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildOption(String title, String description) {
+  static Widget _buildRejectionReason(String reason) {
+    return Row(
+      children: [
+        const Text(
+          '• ',
+          style: TextStyle(
+            fontSize: 13,
+            color: AppColors.textGrey,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            reason,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textGrey,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  static Widget _buildOption(String title, String description) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(
-          Icons.check_circle_outline,
-          size: 20,
-          color: AppColors.caramel,
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: AppColors.caramel.withOpacity(0.15),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.check_circle_outline,
+            size: 16,
+            color: AppColors.caramel,
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
