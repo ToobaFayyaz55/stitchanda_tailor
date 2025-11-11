@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import 'package:stichanda_tailor/view/screens/registration/personal_info_screen.dart';
+import 'package:stichanda_tailor/view/screens/pending_approval_screen.dart';
+import 'package:stichanda_tailor/view/screens/rejected_screen.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -35,6 +37,26 @@ class _LoginScreenState extends State<LoginScreen> {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const HomeScreen()),
+              );
+            } else if (state is PendingApproval) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PendingApprovalScreen(
+                    email: state.email,
+                    name: state.name,
+                  ),
+                ),
+              );
+            } else if (state is VerificationRejected) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RejectedScreen(
+                    email: state.email,
+                    name: state.name,
+                  ),
+                ),
               );
             } else if (state is AuthError) {
               ScaffoldMessenger.of(context).showSnackBar(

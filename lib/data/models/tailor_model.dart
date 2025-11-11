@@ -18,7 +18,7 @@ class Tailor {
   final String image_path;  // Required with default empty string
   final bool is_verified;   // Required with default false
   final int review;        // Required with default 0
-  final String verfication_status; // Required with default 'pending'
+  final int verification_status; // 0=pending, 1=verified, 2=rejected
 
   Tailor({
     required this.tailor_id,
@@ -38,7 +38,7 @@ class Tailor {
     this.image_path = '',  // Default value
     this.is_verified = false, // Default value
     this.review = 0,         // Default value
-    this.verfication_status = 'pending', // Default value
+    this.verification_status = 0, // Default: 0=pending
   });
 
   factory Tailor.fromMap(Map<String, dynamic> map) {
@@ -60,7 +60,7 @@ class Tailor {
       image_path: map['image_path'] as String? ?? '',
       is_verified: map['is_verified'] as bool? ?? false,
       review: map['review'] as int? ?? 0,
-      verfication_status: map['verfication_status'] as String? ?? 'pending',
+      verification_status: map['verification_status'] as int? ?? 0,
     );
   }
 
@@ -83,7 +83,7 @@ class Tailor {
       'image_path': image_path,
       'is_verified': is_verified,
       'review': review,
-      'verfication_status': verfication_status,
+      'verification_status': verification_status,
     };
   }
 
@@ -105,7 +105,7 @@ class Tailor {
     String? image_path,
     bool? is_verified,
     int? review,
-    String? verfication_status,
+    int? verification_status,
   }) {
     return Tailor(
       tailor_id: tailor_id ?? this.tailor_id,
@@ -125,7 +125,7 @@ class Tailor {
       image_path: image_path ?? this.image_path,
       is_verified: is_verified ?? this.is_verified,
       review: review ?? this.review,
-      verfication_status: verfication_status ?? this.verfication_status,
+      verification_status: verification_status ?? this.verification_status,
     );
   }
 }

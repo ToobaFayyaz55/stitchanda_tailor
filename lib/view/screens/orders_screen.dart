@@ -28,7 +28,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   void _fetchOrders() {
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthSuccess) {
-      // Fetch pending orders for this tailor
+      // Fetch all orders for this tailor
       context.read<OrderCubit>().fetchPendingOrderDetailsForTailor(
         authState.tailor.tailor_id,
       );
@@ -36,15 +36,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   List<OrderDetail> _getFilteredOrders(List<OrderDetail> orders) {
+    // Filter out requests (status -2), only show from -1 onwards
+    final nonRequestOrders = orders.where((o) => o.status >= -1).toList();
+
     switch (_selectedStatus) {
       case 'pending':
-        return orders.where((o) => o.status == -1).toList();
+        return nonRequestOrders.where((o) => o.status == -1).toList();
       case 'inProgress':
-        return orders.where((o) => o.status == 0 || o.status == 1).toList();
+        return nonRequestOrders.where((o) => o.status >= 0 && o.status <= 3).toList();
       case 'completed':
-        return orders.where((o) => o.status == 2).toList();
+        return nonRequestOrders.where((o) => o.status >= 4 && o.status <= 11).toList();
       default:
-        return orders;
+        return nonRequestOrders;
     }
   }
 
@@ -154,7 +157,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         itemBuilder: (context, index) {
                           return OrderListItem(
                             orderDetail: filteredOrders[index],
-                            showActions: filteredOrders[index].status == -1,
                           );
                         },
                       ),
@@ -163,7 +165,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           );
         },
       ),
-      bottomNavigationBar: const CustomBottomNavBar(activeIndex: 3),
+      bottomNavigationBar: const CustomBottomNavBar(activeIndex: 4),
     );
   }
 }
@@ -198,23 +200,39 @@ class _FilterChip extends StatelessWidget {
 // Order List Item Widget
 class OrderListItem extends StatelessWidget {
   final OrderDetail orderDetail;
-  final bool showActions;
 
   const OrderListItem({
     required this.orderDetail,
-    required this.showActions,
   });
 
   String _getStatusLabel() {
     switch (orderDetail.status) {
+      case -2:
+        return 'Request';
       case -1:
-        return 'Pending';
+        return 'Accepted (Waiting for Rider)';
       case 0:
-        return 'Accepted';
+        return 'Unassigned';
       case 1:
-        return 'In Progress';
+        return 'Rider Assigned';
       case 2:
+        return 'Picked up from Customer';
+      case 3:
+        return 'Delivered to Tailor';
+      case 4:
+        return 'Received by Tailor';
+      case 5:
         return 'Completed';
+      case 6:
+        return 'Driver Requested';
+      case 7:
+        return 'Driver Assigned';
+      case 8:
+        return 'Picked up from Tailor';
+      case 9:
+        return 'Delivered';
+      case 11:
+        return 'Self-Delivery';
       default:
         return 'Unknown';
     }
@@ -222,13 +240,25 @@ class OrderListItem extends StatelessWidget {
 
   Color _getStatusColor() {
     switch (orderDetail.status) {
+      case -2:
+        return Colors.red;
       case -1:
         return Colors.orange;
       case 0:
-        return Colors.blue;
       case 1:
-        return Colors.purple;
+        return Colors.blue;
       case 2:
+        return Colors.purple;
+      case 3:
+      case 4:
+        return Colors.cyan;
+      case 5:
+      case 6:
+      case 7:
+      case 8:
+        return Colors.amber;
+      case 9:
+      case 11:
         return Colors.green;
       default:
         return Colors.grey;
@@ -328,23 +358,6 @@ class OrderListItem extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (showActions)
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.caramel,
-                    ),
-                    onPressed: () {
-                      // Update order status to accepted
-                      context.read<OrderCubit>().updateOrderDetailStatus(
-                        detailsId: orderDetail.detailsId,
-                        newStatus: 0, // Mark as accepted
-                      );
-                    },
-                    child: const Text(
-                      'Accept',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
               ],
             ),
           ],

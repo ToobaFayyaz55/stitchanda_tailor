@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stichanda_tailor/controller/order_cubit.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
 import 'package:stichanda_tailor/data/models/order_detail_model.dart';
+import 'package:stichanda_tailor/data/models/verification_status.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import '../base/custom_bottom_nav_bar.dart';
 import 'orders_screen.dart';
@@ -147,8 +148,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   const Icon(Icons.verified, color: Colors.green, size: 14),
                                   const SizedBox(width: 6),
                                   Text(
-                                    (authState is AuthSuccess && authState.tailor.verfication_status.isNotEmpty)
-                                        ? authState.tailor.verfication_status
+                                    (authState is AuthSuccess)
+                                        ? VerificationStatus.getStatusName(authState.tailor.verification_status)
                                         : 'unverified',
                                     style: const TextStyle(fontSize: 12, color: AppColors.textGrey),
                                   ),

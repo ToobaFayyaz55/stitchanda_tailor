@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
-import 'cnic_upload_screen.dart';
+import 'location_selection_screen.dart';
 
 class WorkDetailsScreen extends StatefulWidget {
   const WorkDetailsScreen({super.key});
@@ -138,7 +138,7 @@ class _WorkDetailsScreenState extends State<WorkDetailsScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const CnicUploadScreen(),
+                            builder: (context) => const LocationSelectionScreen(),
                           ),
                         );
                       }

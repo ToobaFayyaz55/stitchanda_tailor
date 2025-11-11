@@ -38,6 +38,26 @@ class AuthError extends AuthState {
   List<Object?> get props => [message];
 }
 
+class PendingApproval extends AuthState {
+  final String email;
+  final String name;
+
+  const PendingApproval({required this.email, required this.name});
+
+  @override
+  List<Object?> get props => [email, name];
+}
+
+class VerificationRejected extends AuthState {
+  final String email;
+  final String name;
+
+  const VerificationRejected({required this.email, required this.name});
+
+  @override
+  List<Object?> get props => [email, name];
+}
+
 class RegistrationInProgress extends AuthState {
   final Tailor registrationData;
 
@@ -64,7 +84,20 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       emit(const AuthLoading());
       final tailor = await authRepo.login(email, password);
-      emit(AuthSuccess(tailor));
+
+      // Check verification status
+      if (tailor.verification_status == 0) {
+        // Pending approval
+        emit(PendingApproval(email: tailor.email, name: tailor.name));
+      } else if (tailor.verification_status == 2) {
+        // Rejected
+        emit(VerificationRejected(email: tailor.email, name: tailor.name));
+      } else if (tailor.verification_status == 1) {
+        // Verified - can login
+        emit(AuthSuccess(tailor));
+      } else {
+        emit(AuthError('Unknown verification status'));
+      }
     } catch (e) {
       emit(AuthError(e.toString()));
     }
@@ -87,8 +120,8 @@ class AuthCubit extends Cubit<AuthState> {
     required String name,
     required String email,
     required String phone,
-    required String fullAddress,
     required String gender,
+    String fullAddress = '', // Optional - will be set in LocationSelectionScreen
   }) {
     try {
       _registrationData = (_registrationData ?? Tailor(
@@ -125,6 +158,26 @@ class AuthCubit extends Cubit<AuthState> {
       _registrationData = _registrationData!.copyWith(
         category: categories,
         experience: experience,
+      );
+      emit(RegistrationInProgress(_registrationData!));
+    } catch (e) {
+      emit(AuthError(e.toString()));
+    }
+  }
+
+  void updateLocation({
+    required double latitude,
+    required double longitude,
+    required String fullAddress,
+  }) {
+    try {
+      if (_registrationData == null) {
+        throw Exception('Personal info must be filled first');
+      }
+      _registrationData = _registrationData!.copyWith(
+        latitude: latitude,
+        longitude: longitude,
+        full_address: fullAddress,
       );
       emit(RegistrationInProgress(_registrationData!));
     } catch (e) {
@@ -174,9 +227,12 @@ class AuthCubit extends Cubit<AuthState> {
         imagePath: _registrationData!.image_path,
       );
 
-      // Reset registration data
-      _registrationData = null;
-      emit(AuthSuccess(tailor));
+      // Update registration data with the returned tailor data
+      _registrationData = tailor;
+
+      // Emit RegistrationInProgress to show PendingApprovalScreen
+      // User with verification_status = 0 (pending) should NOT be able to login
+      emit(RegistrationInProgress(_registrationData!));
     } catch (e) {
       // Keep registration data so user can fix and retry
       emit(AuthError(e.toString()));

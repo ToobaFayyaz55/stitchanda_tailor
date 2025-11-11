@@ -61,6 +61,14 @@ class OrderDeleted extends OrderState {
   const OrderDeleted();
 }
 
+class RequestAccepted extends OrderState {
+  const RequestAccepted();
+}
+
+class RequestRejected extends OrderState {
+  const RequestRejected();
+}
+
 class OrderError extends OrderState {
   final String message;
 
@@ -234,6 +242,46 @@ class OrderCubit extends Cubit<OrderState> {
     try {
       await orderRepo.deleteOrder(orderId);
       emit(const OrderDeleted());
+    } catch (e) {
+      emit(OrderError(e.toString()));
+    }
+  }
+
+  // ==================== REQUEST WORKFLOW ACTIONS ====================
+
+  /// Tailor action: Accept incoming order request
+  /// Status transition: -2 → -1
+  Future<void> tailorAcceptRequest({
+    required String detailsId,
+    required String tailorId,
+  }) async {
+    try {
+      emit(const OrderLoading());
+      await orderRepo.tailorAcceptRequest(
+        detailsId: detailsId,
+        tailorId: tailorId,
+      );
+      emit(const RequestAccepted());
+      // Refresh the orders list
+      await getOrderDetailById(detailsId);
+    } catch (e) {
+      emit(OrderError(e.toString()));
+    }
+  }
+
+  /// Tailor action: Reject incoming order request
+  /// Deletes the request
+  Future<void> tailorRejectRequest({
+    required String detailsId,
+    required String tailorId,
+  }) async {
+    try {
+      emit(const OrderLoading());
+      await orderRepo.tailorRejectRequest(
+        detailsId: detailsId,
+        tailorId: tailorId,
+      );
+      emit(const RequestRejected());
     } catch (e) {
       emit(OrderError(e.toString()));
     }

@@ -110,7 +110,7 @@ class AuthRepo {
           cnic: cnicNumber,
           image_path: imageUrl,
           is_verified: false,
-          verfication_status: 'pending',
+          verification_status: 0, // 0 = pending
           review: 0,
           created_at: Timestamp.now(),
           updated_at: Timestamp.now(),

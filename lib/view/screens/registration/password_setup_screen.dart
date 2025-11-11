@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import '../login_screen.dart';
+import '../pending_approval_screen.dart';
 
 class PasswordSetupScreen extends StatefulWidget {
   const PasswordSetupScreen({super.key});
@@ -44,18 +45,17 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
       body: SafeArea(
         child: BlocConsumer<AuthCubit, AuthState>(
           listener: (context, state) {
-            if (state is AuthSuccess) {
-              // Registration successful, show success message
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Registration successful! Please login.'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-              // Navigate to login
+            if (state is RegistrationInProgress) {
+              // After completing registration, show pending approval screen
+              final tailor = state.registrationData;
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                MaterialPageRoute(
+                  builder: (context) => PendingApprovalScreen(
+                    email: tailor.email,
+                    name: tailor.name,
+                  ),
+                ),
                 (route) => false,
               );
             } else if (state is AuthError) {

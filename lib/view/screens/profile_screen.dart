@@ -4,6 +4,7 @@ import 'package:stichanda_tailor/theme/theme.dart';
 import 'package:stichanda_tailor/view/base/custom_bottom_nav_bar.dart';
 import 'package:stichanda_tailor/view/screens/profile_details_screen.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
+import 'package:stichanda_tailor/data/models/verification_status.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -149,7 +150,7 @@ class ProfileScreen extends StatelessWidget {
                                               const Icon(Icons.verified, size: 14, color: Colors.green),
                                               const SizedBox(width: 6),
                                               Text(
-                                                tailor.verfication_status,
+                                                VerificationStatus.getStatusName(tailor.verification_status),
                                                 style: const TextStyle(fontSize: 12, color: AppColors.textGrey),
                                               ),
                                             ],
@@ -310,7 +311,7 @@ class ProfileScreen extends StatelessWidget {
       ),
 
       // Profile Tab Active
-      bottomNavigationBar: const CustomBottomNavBar(activeIndex: 1),
+      bottomNavigationBar: const CustomBottomNavBar(activeIndex: 3),
     );
   }
 }

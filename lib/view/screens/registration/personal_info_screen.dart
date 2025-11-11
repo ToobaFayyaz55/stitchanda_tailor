@@ -17,7 +17,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   final fullNameController = TextEditingController();
   final emailController = TextEditingController();
   final phoneController = TextEditingController();
-  final addressController = TextEditingController();
 
   String gender = "male"; // default selected
 
@@ -26,7 +25,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     fullNameController.dispose();
     emailController.dispose();
     phoneController.dispose();
-    addressController.dispose();
     super.dispose();
   }
 
@@ -143,16 +141,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 ),
                 const SizedBox(height: 15),
 
-                // Address
-                TextFormField(
-                  controller: addressController,
-                  decoration: const InputDecoration(
-                    labelText: "Address",
-                    prefixIcon: Icon(Icons.location_on_outlined),
-                  ),
-                  validator: (v) =>
-                  v!.isEmpty ? "Please enter your address" : null,
-                ),
+                // Address - NOTE: Address and location will be captured in LocationSelectionScreen
+                // This allows GPS-based location capture with latitude and longitude
 
                 const SizedBox(height: 40),
 
@@ -167,11 +157,11 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                     onPressed: () {
                       if (_formKey.currentState!.validate()) {
                         // Save personal info to AuthCubit
+                        // Note: Address and location will be captured in LocationSelectionScreen
                         context.read<AuthCubit>().updatePersonalInfo(
                           name: fullNameController.text.trim(),
                           email: emailController.text.trim(),
                           phone: phoneController.text.trim(),
-                          fullAddress: addressController.text.trim(),
                           gender: gender,
                         );
 

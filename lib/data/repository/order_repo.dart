@@ -220,13 +220,102 @@ class OrderRepo {
   // These methods enforce strict order status transitions per tailor workflow
 
   /// Status Constants (Tailor-side relevant)
-  static const int STATUS_RECEIVED_BY_TAILOR = 4;
-  static const int STATUS_TAILOR_COMPLETED = 5;
-  static const int STATUS_DRIVER_REQUESTED = 6;
-  static const int STATUS_DRIVER_ASSIGNED = 7;
-  static const int STATUS_PICKED_FROM_TAILOR = 8;
-  static const int STATUS_DELIVERED = 9;
-  static const int STATUS_SELF_DELIVERY = 11;
+  static const int STATUS_REQUEST = -2; // New order request from customer
+  static const int STATUS_ACCEPTED_WAITING_RIDER = -1; // Tailor accepted, waiting for customer to book rider
+  static const int STATUS_UNASSIGNED = 0; // Rider not yet assigned
+  static const int STATUS_ASSIGNED = 1; // Rider assigned
+  static const int STATUS_PICKED_FROM_CUSTOMER = 2; // Rider picked up from customer
+  static const int STATUS_DELIVERED_TO_TAILOR = 3; // Order delivered to tailor
+  static const int STATUS_RECEIVED_BY_TAILOR = 4; // Tailor received order
+  static const int STATUS_TAILOR_COMPLETED = 5; // Tailor completed stitching
+  static const int STATUS_DRIVER_REQUESTED = 6; // Tailor requested rider for return
+  static const int STATUS_DRIVER_ASSIGNED = 7; // Driver assigned for return
+  static const int STATUS_PICKED_FROM_TAILOR = 8; // Picked up from tailor for return
+  static const int STATUS_DELIVERED = 9; // Delivered back to customer
+  static const int STATUS_SELF_DELIVERY = 11; // Self-delivered by tailor
+
+  /// Tailor accepts order request
+  /// Transition: status -2 → -1
+  /// Updates: status, accepted_at
+  Future<void> tailorAcceptRequest({
+    required String detailsId,
+    required String tailorId,
+  }) async {
+    try {
+      await FirebaseFirestore.instance.runTransaction((tx) async {
+        final docRef = _orderDetailCollection.doc(detailsId);
+        final snapshot = await tx.get(docRef);
+
+        if (!snapshot.exists) {
+          throw Exception('Order not found');
+        }
+
+        final data = snapshot.data() as Map<String, dynamic>;
+        final currentStatus = (data['status'] ?? -99) as int;
+        final docTailorId = data['tailor_id'] as String?;
+
+        // Validate current status
+        if (currentStatus != STATUS_REQUEST) {
+          throw Exception(
+            'Invalid transition: can only accept when status == $STATUS_REQUEST (current: $currentStatus)',
+          );
+        }
+
+        // Validate tailor ownership
+        if (docTailorId != null && docTailorId != tailorId) {
+          throw Exception('Unauthorized: tailor mismatch');
+        }
+
+        // Update order
+        tx.update(docRef, {
+          'status': STATUS_ACCEPTED_WAITING_RIDER,
+          'accepted_at': FieldValue.serverTimestamp(),
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+      });
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Tailor rejects order request
+  /// This effectively deletes or marks as rejected
+  Future<void> tailorRejectRequest({
+    required String detailsId,
+    required String tailorId,
+  }) async {
+    try {
+      await FirebaseFirestore.instance.runTransaction((tx) async {
+        final docRef = _orderDetailCollection.doc(detailsId);
+        final snapshot = await tx.get(docRef);
+
+        if (!snapshot.exists) {
+          throw Exception('Order not found');
+        }
+
+        final data = snapshot.data() as Map<String, dynamic>;
+        final currentStatus = (data['status'] ?? -99) as int;
+        final docTailorId = data['tailor_id'] as String?;
+
+        // Validate current status
+        if (currentStatus != STATUS_REQUEST) {
+          throw Exception(
+            'Invalid transition: can only reject when status == $STATUS_REQUEST (current: $currentStatus)',
+          );
+        }
+
+        // Validate tailor ownership
+        if (docTailorId != null && docTailorId != tailorId) {
+          throw Exception('Unauthorized: tailor mismatch');
+        }
+
+        // Delete the rejected request (or mark rejected - here we delete)
+        tx.delete(docRef);
+      });
+    } catch (e) {
+      rethrow;
+    }
+  }
 
   /// Tailor presses "Receive Order"
   /// Transition: status 3 → 4
@@ -411,7 +500,11 @@ class OrderRepo {
   /// Returns the UI action name or empty string if no button should show
   static String getButtonVisibility(int status) {
     switch (status) {
-      case 3:
+      case STATUS_REQUEST:
+        return 'Accept / Reject';
+      case STATUS_ACCEPTED_WAITING_RIDER:
+        return 'Waiting for Rider Booking';
+      case STATUS_DELIVERED_TO_TAILOR:
         return 'Receive Order';
       case STATUS_RECEIVED_BY_TAILOR:
         return 'Mark as Completed';
@@ -433,6 +526,9 @@ class OrderRepo {
 
   /// Validate if tailor can perform an action on this order
   static bool canTailorActOn(int status) {
-    return status >= 3 && status < STATUS_DELIVERED;
+    // Tailor can act on requests, accepted-waiting, and delivery stages
+    return status == STATUS_REQUEST ||
+           status == STATUS_ACCEPTED_WAITING_RIDER ||
+           (status >= STATUS_DELIVERED_TO_TAILOR && status < STATUS_DELIVERED);
   }
 }
