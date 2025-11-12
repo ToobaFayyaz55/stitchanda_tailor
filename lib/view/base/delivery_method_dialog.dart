@@ -83,10 +83,10 @@ class _DeliveryMethodDialogState extends State<DeliveryMethodDialog> {
 
     try {
       // Mark order as customer self-pickup (status 5 → 11)
-      await context.read<OrderCubit>().tailorSelfDeliver(
-        detailsId: widget.orderDetail.detailsId,
-        tailorId: widget.tailorId,
-      );
+      // await context.read<OrderCubit>().tailorSelfDeliver(
+      //   detailsId: widget.orderDetail.detailsId,
+      //   tailorId: widget.tailorId,
+      // );
 
       // Close dialog
       if (mounted) {

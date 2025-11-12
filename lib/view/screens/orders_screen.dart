@@ -3,51 +3,41 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import 'package:stichanda_tailor/controller/order_cubit.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
-import 'package:stichanda_tailor/data/models/order_detail_model.dart';
 import '../base/custom_bottom_nav_bar.dart';
+import 'order_details_screen.dart';
+import 'package:stichanda_tailor/data/repository/order_repo.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
-
   @override
   State<OrdersScreen> createState() => _OrdersScreenState();
 }
 
 class _OrdersScreenState extends State<OrdersScreen> {
-  late String _selectedStatus; // 'pending', 'inProgress', 'completed'
+  String _selectedFilter = 'accepted'; // accepted | inProgress | completed
 
   @override
   void initState() {
     super.initState();
-    _selectedStatus = 'inProgress'; // Default filter
-
-    // Fetch orders when screen loads
     _fetchOrders();
   }
 
   void _fetchOrders() {
-    final authState = context.read<AuthCubit>().state;
-    if (authState is AuthSuccess) {
-      // Fetch all orders for this tailor
-      context.read<OrderCubit>().fetchPendingOrderDetailsForTailor(
-        authState.tailor.tailor_id,
-      );
-    }
-  }
-
-  List<OrderDetail> _getFilteredOrders(List<OrderDetail> orders) {
-    // Filter out requests (status -2), only show from -1 onwards
-    final nonRequestOrders = orders.where((o) => o.status >= -1).toList();
-
-    switch (_selectedStatus) {
-      case 'pending':
-        return nonRequestOrders.where((o) => o.status == -1).toList();
-      case 'inProgress':
-        return nonRequestOrders.where((o) => o.status >= 0 && o.status <= 3).toList();
-      case 'completed':
-        return nonRequestOrders.where((o) => o.status >= 4 && o.status <= 11).toList();
-      default:
-        return nonRequestOrders;
+    final auth = context.read<AuthCubit>().state;
+    if (auth is AuthSuccess) {
+      switch (_selectedFilter) {
+        case 'accepted':
+          context.read<OrderCubit>().fetchAcceptedOrdersForTailor(auth.tailor.tailor_id);
+          break;
+        case 'inProgress':
+          // In-progress: statuses 0..3 (after acceptance until tailor receives)
+          context.read<OrderCubit>().fetchOrdersForTailor(auth.tailor.tailor_id, statuses: [0, 1, 2, 3]);
+          break;
+        case 'completed':
+          // Completed / tail end statuses 4..11
+          context.read<OrderCubit>().fetchOrdersForTailor(auth.tailor.tailor_id, statuses: [4,5,6,7,8,9,10,11]);
+          break;
+      }
     }
   }
 
@@ -57,312 +47,204 @@ class _OrdersScreenState extends State<OrdersScreen> {
       appBar: AppBar(
         title: const Text('Orders'),
         automaticallyImplyLeading: false,
-        actions: const [
-          Icon(Icons.settings_outlined),
-          SizedBox(width: 12),
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchOrders),
+          const SizedBox(width: 8),
         ],
       ),
-      body: BlocConsumer<OrderCubit, OrderState>(
-        listener: (context, state) {
-          if (state is OrderError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        },
-        builder: (context, state) {
-          if (state is OrderLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          List<OrderDetail> allOrders = [];
-          if (state is OrderDetailsSuccess) {
-            allOrders = state.orderDetails;
-          }
-
-          final filteredOrders = _getFilteredOrders(allOrders);
-
-          return Column(
-            children: [
-              // Search Bar
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search orders...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+      body: Column(
+        children: [
+          _FilterBar(
+            selected: _selectedFilter,
+            onChanged: (v) {
+              setState(() => _selectedFilter = v);
+              _fetchOrders();
+            },
+          ),
+          Expanded(
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _buildOrdersStream(context),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final orders = snapshot.data ?? [];
+                if (orders.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.shopping_bag_outlined, size: 80, color: AppColors.textGrey),
+                        const SizedBox(height: 16),
+                        Text('No orders', style: Theme.of(context).textTheme.titleLarge),
+                        const SizedBox(height: 8),
+                        Text('Change filter or wait for updates', style: Theme.of(context).textTheme.bodyMedium),
+                      ],
                     ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-
-              // Filter Chips
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _FilterChip(
-                        label: 'Pending',
-                        isSelected: _selectedStatus == 'pending',
-                        onPressed: () => setState(() => _selectedStatus = 'pending'),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'In Progress',
-                        isSelected: _selectedStatus == 'inProgress',
-                        onPressed: () => setState(() => _selectedStatus = 'inProgress'),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'Completed',
-                        isSelected: _selectedStatus == 'completed',
-                        onPressed: () => setState(() => _selectedStatus = 'completed'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Orders List
-              Expanded(
-                child: filteredOrders.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.shopping_bag_outlined,
-                              size: 80,
-                              color: AppColors.textGrey,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No orders found',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: filteredOrders.length,
-                        itemBuilder: (context, index) {
-                          return OrderListItem(
-                            orderDetail: filteredOrders[index],
-                          );
-                        },
-                      ),
-              ),
-            ],
-          );
-        },
+                  );
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: orders.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, i) => _OrderCard(order: orders[i]),
+                );
+              },
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: const CustomBottomNavBar(activeIndex: 4),
     );
   }
+
+  Stream<List<Map<String, dynamic>>> _buildOrdersStream(BuildContext context) {
+    final auth = context.read<AuthCubit>().state;
+    if (auth is! AuthSuccess) return const Stream.empty();
+    switch (_selectedFilter) {
+      case 'accepted':
+        return context.read<OrderCubit>().streamOrdersForTailor(auth.tailor.tailor_id, statuses: [OrderRepo.STATUS_ACCEPTED]);
+      case 'inProgress':
+        return context.read<OrderCubit>().streamOrdersForTailor(auth.tailor.tailor_id, statuses: [0,1,2,3]);
+      case 'completed':
+        return context.read<OrderCubit>().streamOrdersForTailor(auth.tailor.tailor_id, statuses: [4,5,6,7,8,9,10,11]);
+      default:
+        return context.read<OrderCubit>().streamOrdersForTailor(auth.tailor.tailor_id);
+    }
+  }
 }
 
-// Filter Chip Widget
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onPressed;
-
-  const _FilterChip({
-    required this.label,
-    required this.isSelected,
-    required this.onPressed,
-  });
+class _FilterBar extends StatelessWidget {
+  final String selected;
+  final ValueChanged<String> onChanged;
+  const _FilterBar({required this.selected, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (_) => onPressed(),
-      selectedColor: AppColors.caramel,
-      labelStyle: TextStyle(
-        color: isSelected ? Colors.white : AppColors.textBlack,
-        fontWeight: FontWeight.w500,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Wrap(
+        spacing: 8,
+        children: [
+          _chip('Accepted'),
+          _chip('In Progress'),
+          _chip('Completed'),
+        ],
       ),
+    );
+  }
+
+  Widget _chip(String label) {
+    final v = label.toLowerCase().replaceAll(' ', '');
+    final isSel = selected == v;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSel,
+      onSelected: (_) => onChanged(v),
+      selectedColor: AppColors.caramel,
+      labelStyle: TextStyle(color: isSel ? Colors.white : AppColors.textBlack),
     );
   }
 }
 
-// Order List Item Widget
-class OrderListItem extends StatelessWidget {
-  final OrderDetail orderDetail;
-
-  const OrderListItem({
-    required this.orderDetail,
-  });
-
-  String _getStatusLabel() {
-    switch (orderDetail.status) {
-      case -2:
-        return 'Request';
-      case -1:
-        return 'Accepted (Waiting for Rider)';
-      case 0:
-        return 'Unassigned';
-      case 1:
-        return 'Rider Assigned';
-      case 2:
-        return 'Picked up from Customer';
-      case 3:
-        return 'Delivered to Tailor';
-      case 4:
-        return 'Received by Tailor';
-      case 5:
-        return 'Completed';
-      case 6:
-        return 'Driver Requested';
-      case 7:
-        return 'Driver Assigned';
-      case 8:
-        return 'Picked up from Tailor';
-      case 9:
-        return 'Delivered';
-      case 11:
-        return 'Self-Delivery';
-      default:
-        return 'Unknown';
-    }
-  }
-
-  Color _getStatusColor() {
-    switch (orderDetail.status) {
-      case -2:
-        return Colors.red;
-      case -1:
-        return Colors.orange;
-      case 0:
-      case 1:
-        return Colors.blue;
-      case 2:
-        return Colors.purple;
-      case 3:
-      case 4:
-        return Colors.cyan;
-      case 5:
-      case 6:
-      case 7:
-      case 8:
-        return Colors.amber;
-      case 9:
-      case 11:
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
-  }
+class _OrderCard extends StatelessWidget {
+  final Map<String, dynamic> order;
+  const _OrderCard({required this.order});
 
   @override
   Widget build(BuildContext context) {
+    final pickup = order['pickup_location'] as Map<String, dynamic>?;
+    final dropoff = order['dropoff_location'] as Map<String, dynamic>?;
+    final price = (order['total_price'] as num?)?.toDouble() ?? 0.0;
+    final orderId = (order['order_id'] as String?) ?? '';
+    final status = (order['status'] as int?) ?? -999;
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header with status badge
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        orderDetail.customerName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        orderDetail.orderId,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textGrey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    _getStatusLabel(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => OrderDetailsScreen(order: order)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Order #$orderId', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text('Pickup: ${pickup?['full_address'] ?? '-'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.textGrey)),
+                        Text('Dropoff: ${dropoff?['full_address'] ?? '-'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.textGrey)),
+                      ],
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Description
-            Text(
-              orderDetail.description,
-              style: const TextStyle(fontSize: 14),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 12),
-
-            // Price and Payment Status
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Price: Rs. ${orderDetail.totalPrice}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.caramel,
-                      ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _statusColor(status),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Payment: ${orderDetail.paymentStatus}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: orderDetail.paymentStatus == 'Pending'
-                            ? Colors.orange
-                            : Colors.green,
-                      ),
+                    child: Text(
+                      _statusLabel(status),
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                     ),
-                  ],
-                ),
-              ],
-            ),
-          ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text('Total: Rs. ${price.toStringAsFixed(0)}', style: const TextStyle(color: AppColors.caramel, fontWeight: FontWeight.w700)),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  String _statusLabel(int s) {
+    switch (s) {
+      case -1: return 'Accepted';
+      case 0: return 'Unassigned';
+      case 1: return 'Rider Assigned';
+      case 2: return 'Picked (Cust)';
+      case 3: return 'Completed (Cust)';
+      case 4: return 'Received';
+      case 5: return 'Tailor Done';
+      case 6: return 'Call Rider';
+      case 7: return 'Rider Assigned';
+      case 8: return 'Picked (Tailor)';
+      case 9: return 'Delivered';
+      case 10: return 'Confirmed';
+      case 11: return 'Self Delivery';
+      case -2: return 'Pending';
+      case -3: return 'Rejected';
+      default: return 'Unknown';
+    }
+  }
+
+  Color _statusColor(int s) {
+    switch (s) {
+      case -2: return Colors.red;
+      case -3: return Colors.grey;
+      case -1: return Colors.orange;
+      case 0: return Colors.blueGrey;
+      case 1: return Colors.blue;
+      case 2: return Colors.purple;
+      case 3: return Colors.indigo;
+      case 4: return Colors.cyan;
+      case 5: return Colors.green.shade700;
+      case 6: return Colors.deepOrange;
+      case 7: return Colors.deepPurple;
+      case 8: return Colors.teal;
+      case 9: return Colors.lightGreen;
+      case 10: return Colors.greenAccent.shade400;
+      case 11: return Colors.brown;
+      default: return Colors.black45;
+    }
   }
 }

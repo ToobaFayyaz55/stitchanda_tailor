@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
+import 'package:stichanda_tailor/data/models/tailor_model.dart';
 
 class ProfileDetailsScreen extends StatelessWidget {
   const ProfileDetailsScreen({super.key});
@@ -82,9 +83,9 @@ class ProfileDetailsScreen extends StatelessWidget {
                         ),
                         _EditableProfileField(
                           label: 'Address',
-                          value: tailor.full_address,
+                          value: tailor.address.full_address,
                           isEditable: true,
-                          onEdit: () => _showEditDialog(context, 'Address', tailor.full_address, (newValue) {
+                          onEdit: () => _showEditDialog(context, 'Address', tailor.address.full_address, (newValue) {
                             context.read<AuthCubit>().updateTailorProfile({'full_address': newValue});
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Address updated successfully')),
@@ -93,9 +94,9 @@ class ProfileDetailsScreen extends StatelessWidget {
                         ),
                         _EditableProfileField(
                           label: 'Gender',
-                          value: tailor.gender ?? 'Not specified',
+                          value: tailor.gender,
                           isEditable: true,
-                          onEdit: () => _showEditDialog(context, 'Gender', tailor.gender ?? '', (newValue) {
+                          onEdit: () => _showEditDialog(context, 'Gender', tailor.gender, (newValue) {
                             context.read<AuthCubit>().updateTailorProfile({'gender': newValue});
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Gender updated successfully')),
@@ -104,9 +105,9 @@ class ProfileDetailsScreen extends StatelessWidget {
                         ),
                         _EditableProfileField(
                           label: 'Experience',
-                          value: '${tailor.experience ?? 0} years',
+                          value: '${tailor.experience} years',
                           isEditable: true,
-                          onEdit: () => _showEditDialog(context, 'Experience (years)', '${tailor.experience ?? 0}', (newValue) {
+                          onEdit: () => _showEditDialog(context, 'Experience (years)', '${tailor.experience}', (newValue) {
                             final experience = int.tryParse(newValue) ?? tailor.experience;
                             context.read<AuthCubit>().updateTailorProfile({'experience': experience});
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -163,7 +164,7 @@ class ProfileDetailsScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        _ReviewSection(review: tailor.review.toInt()),
+                        _ReviewSection(review: tailor.review),
 
                         const SizedBox(height: 24),
 
@@ -246,7 +247,7 @@ class _DetailHeader extends StatelessWidget {
                 .copyWith(fontWeight: FontWeight.w600),
           ),
           Text(
-            tailor.verfication_status ?? 'Not verified',
+            tailor.verification_status == 1 ? 'Verified' : tailor.verification_status == 0 ? 'Pending Approval' : 'Rejected',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],
@@ -501,4 +502,3 @@ void _showEditDialog(
     ),
   );
 }
-

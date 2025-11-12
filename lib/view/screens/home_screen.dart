@@ -4,9 +4,12 @@ import 'package:stichanda_tailor/controller/order_cubit.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
 import 'package:stichanda_tailor/data/models/order_detail_model.dart';
 import 'package:stichanda_tailor/data/models/verification_status.dart';
+import 'package:stichanda_tailor/data/models/tailor_model.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import '../base/custom_bottom_nav_bar.dart';
 import 'orders_screen.dart';
+import 'package:stichanda_tailor/modules/chat/cubit/chat_cubit.dart';
+import 'package:stichanda_tailor/modules/chat/screens/chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -415,6 +418,36 @@ class OrderDetailCard extends StatelessWidget {
     }
   }
 
+  void _openChat(BuildContext context) async {
+    final authState = context.read<AuthCubit>().state;
+    if (authState is! AuthSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login again to use chat')),
+      );
+      return;
+    }
+    final me = authState.tailor.tailor_id;
+    final other = orderDetail.customerId;
+    if (other.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Customer id unavailable for this order')),
+      );
+      return;
+    }
+    try {
+      final conv = await context.read<ChatCubit>().startConversation(me, other);
+      // ignore: use_build_context_synchronously
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ChatScreen(conversation: conv)),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to start chat: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -451,23 +484,33 @@ class OrderDetailCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(orderDetail.status),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    _getStatusLabel(orderDetail.status),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Chat with customer',
+                      onPressed: () => _openChat(context),
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      color: AppColors.caramel,
                     ),
-                  ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(orderDetail.status),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        _getStatusLabel(orderDetail.status),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

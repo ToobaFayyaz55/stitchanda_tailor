@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:stichanda_tailor/data/models/tailor_model.dart';
+import 'package:stichanda_tailor/data/services/stripe_service.dart';
 
 class AuthRepo {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
@@ -69,6 +70,8 @@ class AuthRepo {
     required int experience,
     required int cnicNumber,
     required String imagePath,
+    double latitude = 0.0,
+    double longitude = 0.0,
   }) async {
     UserCredential? userCredential;
 
@@ -94,36 +97,44 @@ class AuthRepo {
           }
         }
 
-        // 3. Create tailor document in Firestore
+        // 3. Create tailor document in Firestore per schema
         final tailor = Tailor(
           tailor_id: userId,
           name: name,
           email: email,
           phone: phone,
-          full_address: fullAddress,
-          latitude: 0.0,
-          longitude: 0.0,
-          availibility_status: true,
-          category: categories,
-          gender: gender,
-          experience: experience,
           cnic: cnicNumber,
-          image_path: imageUrl,
+          gender: gender,
+          category: categories,
+          experience: experience,
+          review: 0,
+          availibility_status: true,
           is_verified: false,
           verification_status: 0, // 0 = pending
-          review: 0,
+          address: TailorAddress(full_address: fullAddress, latitude: latitude, longitude: longitude),
+          image_path: imageUrl,
+          stripe_account_id: '',
           created_at: Timestamp.now(),
           updated_at: Timestamp.now(),
         );
 
         await _firestore.collection('tailor').doc(userId).set(tailor.toMap());
 
-        // 4. Sign out user
+        // 4. Attempt to create Stripe connected account (non-blocking failure)
+        final stripeId = await StripeService.createConnectedAccount(email: email);
+        Tailor finalTailor = tailor;
+        if (stripeId != null) {
+          await _firestore.collection('tailor').doc(userId).update({
+            'stripe_account_id': stripeId,
+            'updated_at': FieldValue.serverTimestamp(),
+          });
+          finalTailor = tailor.copyWith(stripe_account_id: stripeId);
+        }
+
         await _firebaseAuth.signOut();
 
-        return tailor;
+        return finalTailor;
       } catch (e) {
-        // If Firestore fails, delete Auth user
         try {
           await userCredential.user?.delete();
           await _firebaseAuth.signOut();
@@ -149,10 +160,13 @@ class AuthRepo {
     try {
       final docRef = _firestore.collection('tailor').doc(tailorId);
 
-      // Add updated_at timestamp
-      updatedData['updated_at'] = FieldValue.serverTimestamp();
+      // Translate legacy keys to nested address keys
+      final Map<String, dynamic> updates = {...updatedData};
 
-      await docRef.update(updatedData);
+      // Add updated_at timestamp
+      updates['updated_at'] = FieldValue.serverTimestamp();
+
+      await docRef.update(updates);
 
       final doc = await docRef.get();
       if (!doc.exists) throw Exception('Tailor not found');
@@ -182,7 +196,8 @@ class AuthRepo {
         return Tailor.fromMap({
           ...doc.data() as Map<String, dynamic>,
           'tailor_id': userId,
-        });
+        }
+        );
       } else {
         throw Exception('Tailor profile not found');
       }

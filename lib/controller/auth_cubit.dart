@@ -1,5 +1,6 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stichanda_tailor/data/models/tailor_model.dart';
 import 'package:stichanda_tailor/data/repository/auth_repo.dart';
 
@@ -129,17 +130,26 @@ class AuthCubit extends Cubit<AuthState> {
         name: '',
         email: '',
         phone: '',
-        full_address: '',
-        latitude: 0.0,
-        longitude: 0.0,
+        cnic: 0,
+        gender: 'male',
+        category: const [],
+        experience: 0,
+        review: 0,
         availibility_status: true,
-        category: [],
+        is_verified: false,
+        verification_status: 0,
+        address: const TailorAddress(full_address: '', latitude: 0.0, longitude: 0.0),
+        image_path: '',
+        stripe_account_id: '',
+        created_at: Timestamp.now(),
+        updated_at: Timestamp.now(),
       )).copyWith(
         name: name,
         email: email,
         phone: phone,
-        full_address: fullAddress,
         gender: gender,
+        address: (_registrationData?.address ?? const TailorAddress(full_address: '', latitude: 0.0, longitude: 0.0))
+            .copyWith(full_address: fullAddress),
       );
       emit(RegistrationInProgress(_registrationData!));
     } catch (e) {
@@ -175,9 +185,11 @@ class AuthCubit extends Cubit<AuthState> {
         throw Exception('Personal info must be filled first');
       }
       _registrationData = _registrationData!.copyWith(
-        latitude: latitude,
-        longitude: longitude,
-        full_address: fullAddress,
+        address: (_registrationData!.address).copyWith(
+          latitude: latitude,
+          longitude: longitude,
+          full_address: fullAddress,
+        ),
       );
       emit(RegistrationInProgress(_registrationData!));
     } catch (e) {
@@ -219,19 +231,20 @@ class AuthCubit extends Cubit<AuthState> {
         email: _registrationData!.email,
         password: password,
         phone: _registrationData!.phone,
-        fullAddress: _registrationData!.full_address,
-        gender: _registrationData!.gender ?? 'male',
+        fullAddress: _registrationData!.address.full_address,
+        gender: _registrationData!.gender,
         categories: _registrationData!.category,
-        experience: _registrationData!.experience ?? 0,
-        cnicNumber: _registrationData!.cnic ?? 0,
+        experience: _registrationData!.experience,
+        cnicNumber: _registrationData!.cnic,
         imagePath: _registrationData!.image_path,
+        latitude: _registrationData!.address.latitude,
+        longitude: _registrationData!.address.longitude,
       );
 
       // Update registration data with the returned tailor data
       _registrationData = tailor;
 
       // Emit RegistrationInProgress to show PendingApprovalScreen
-      // User with verification_status = 0 (pending) should NOT be able to login
       emit(RegistrationInProgress(_registrationData!));
     } catch (e) {
       // Keep registration data so user can fix and retry

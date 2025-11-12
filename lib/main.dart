@@ -10,6 +10,9 @@ import 'package:stichanda_tailor/data/repository/auth_repo.dart' as auth_repo;
 import 'package:stichanda_tailor/data/repository/order_repo.dart' as order_repo;
 import 'package:stichanda_tailor/data/repository/ride_repo.dart' as ride_repo;
 import 'package:stichanda_tailor/view/screens/login_screen.dart';
+// Chat module imports
+import 'package:stichanda_tailor/modules/chat/cubit/chat_cubit.dart';
+import 'package:stichanda_tailor/modules/chat/repository/chat_repository.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +41,10 @@ class MyApp extends StatelessWidget {
         BlocProvider(
           create: (context) => RideCubit(rideRepo: ride_repo.RideRepo()),
         ),
+        // Chat cubit available app-wide
+        BlocProvider(
+          create: (context) => ChatCubit(ChatRepository()),
+        ),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -48,4 +55,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-

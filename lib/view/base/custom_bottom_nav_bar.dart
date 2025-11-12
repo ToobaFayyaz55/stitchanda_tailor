@@ -4,6 +4,7 @@ import 'package:stichanda_tailor/view/screens/home_screen.dart';
 import 'package:stichanda_tailor/view/screens/orders_screen.dart';
 import 'package:stichanda_tailor/view/screens/requests_screen.dart';
 import 'package:stichanda_tailor/view/screens/profile_screen.dart';
+import 'package:stichanda_tailor/modules/chat/screens/conversations_screen.dart';
 
 class CustomBottomNavBar extends StatelessWidget {
   final int activeIndex;
@@ -15,8 +16,9 @@ class CustomBottomNavBar extends StatelessWidget {
 
     switch (index) {
       case 0:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Chat Coming Soon ✨')),
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ConversationsScreen()),
         );
         break;
 

@@ -1,534 +1,260 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:stichanda_tailor/data/models/order_model.dart';
 import 'package:stichanda_tailor/data/models/order_detail_model.dart';
 
+/// Repository managing tailor-facing order flows using Firestore.
+/// Schema reference:
+/// orders: { created_at, customer_id, delivery_date, dropoff_location{full_address,latitude,longitude},
+///           order_id, payment_method, payment_status, pickup_location{...}, rider_id, status, tailor_id,
+///           total_price, updated_at }
+/// order_details: { customer_name, description, details_id, due_data, fabric{dupata_fabric,shirt_fabric,trouser_fabric},
+///                  image_path, measurements{arm_length,chest,fitting_preferences,hips,shoulder,waist,wrist},
+///                  order_id, price, tailor_id, totalprice }
 class OrderRepo {
-  final CollectionReference _orderCollection =
-      FirebaseFirestore.instance.collection('order');
-  final CollectionReference _orderDetailCollection =
-      FirebaseFirestore.instance.collection('orderDetail');
+  // Firestore collections (names per user spec; ensure they match actual Firebase setup)
+  final CollectionReference _ordersCol = FirebaseFirestore.instance.collection('order');
+  final CollectionReference _orderDetailsCol = FirebaseFirestore.instance.collection('orderDetail');
 
-  // Helper to normalize various timestamp representations to DateTime
-  DateTime _toDateTime(Object? value) {
-    if (value == null) return DateTime.fromMillisecondsSinceEpoch(0);
-    if (value is DateTime) return value;
-    if (value is Timestamp) return value.toDate();
-    if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
-    if (value is String) {
-      try {
-        return DateTime.parse(value);
-      } catch (_) {
-        return DateTime.fromMillisecondsSinceEpoch(0);
+  // ==================== STATUS CONSTANTS ====================
+  static const int STATUS_UNACCEPTED = -2; // tailor must decide
+  static const int STATUS_REJECTED = -3;   // tailor rejected
+  static const int STATUS_ACCEPTED = -1;   // tailor accepted
+  static const int STATUS_UNASSIGNED = 0;  // customer side
+  static const int STATUS_RIDER_ASSIGNED_CUSTOMER = 1;
+  static const int STATUS_PICKED_UP_CUSTOMER = 2;
+  static const int STATUS_COMPLETED_CUSTOMER = 3; // (original list called 3 Completed - customer side)
+  static const int STATUS_RECEIVED_TAILOR = 4;    // tailor received physically
+  static const int STATUS_COMPLETED_TAILOR = 5;   // stitching done
+  static const int STATUS_CALL_RIDER_TAILOR = 6;  // tailor requested rider
+  static const int STATUS_RIDER_ASSIGNED_TAILOR = 7; // rider assigned for return
+  static const int STATUS_PICKED_FROM_TAILOR = 8; // picked up from tailor
+  static const int STATUS_COMPLETED_TO_CUSTOMER = 9; // delivered to customer
+  static const int STATUS_CUSTOMER_CONFIRMED = 10;   // customer confirmed
+  static const int STATUS_SELF_DELIVERY = 11;        // tailor self delivery
+
+  // ==================== PUBLIC FETCH METHODS ====================
+
+  /// Fetch all orders for a tailor optionally filtered by statuses.
+  /// Returns a list of Map<String,dynamic> representing raw order docs (with 'order_id').
+  Future<List<Map<String, dynamic>>> fetchOrdersForTailor(String tailorId, {List<int>? statuses}) async {
+    Query query = _ordersCol.where('tailor_id', isEqualTo: tailorId);
+    if (statuses != null && statuses.isNotEmpty) {
+      // Firestore doesn't support multiple equality OR in one query, so if >1 we must client-filter.
+      if (statuses.length == 1) {
+        query = query.where('status', isEqualTo: statuses.first);
+        final snap = await query.get();
+        return snap.docs.map((d) => _orderDocToMap(d)).toList();
+      } else {
+        final snap = await query.get();
+        return snap.docs
+            .where((d) => statuses.contains((d.data() as Map<String, dynamic>)['status']))
+            .map((d) => _orderDocToMap(d))
+            .toList();
+      }
+    } else {
+      final snap = await query.get();
+      return snap.docs.map((d) => _orderDocToMap(d)).toList();
+    }
+  }
+
+  /// Fetch pending (status -2) orders for a tailor.
+  Future<List<Map<String, dynamic>>> fetchPendingOrders(String tailorId) =>
+      fetchOrdersForTailor(tailorId, statuses: [STATUS_UNACCEPTED]);
+
+  /// Fetch accepted (status -1) orders for a tailor.
+  Future<List<Map<String, dynamic>>> fetchAcceptedOrders(String tailorId) =>
+      fetchOrdersForTailor(tailorId, statuses: [STATUS_ACCEPTED]);
+
+  /// Fetch a single order by id (returns raw map or null).
+  Future<Map<String, dynamic>?> getOrderById(String orderId) async {
+    final doc = await _ordersCol.doc(orderId).get();
+    if (!doc.exists) return null;
+    return _orderDocToMap(doc);
+  }
+
+  /// Fetch all details (items) for an order_id.
+  /// Status is NOT stored in order_details; consumer should use order status from parent order.
+  Future<List<Map<String, dynamic>>> getOrderDetails(String orderId) async {
+    final snap = await _orderDetailsCol.where('order_id', isEqualTo: orderId).get();
+    return snap.docs.map((d) => _detailDocToMap(d)).toList();
+  }
+
+  /// Compatibility method for existing UI expecting OrderDetail objects with injected status.
+  /// Joins all tailor's details with their parent order status (status lives only on order).
+  Future<List<OrderDetail>> getPendingOrderDetailsForTailor(String tailorId) async {
+    final detailsSnap = await _orderDetailsCol.where('tailor_id', isEqualTo: tailorId).get();
+    final details = detailsSnap.docs
+        .map((d) => OrderDetail.fromMap({...d.data() as Map<String, dynamic>, 'details_id': d.id}))
+        .toList();
+    if (details.isEmpty) return details;
+    final orderIds = details.map((e) => e.orderId).toSet().toList();
+    final statusMap = await _bulkFetchStatuses(orderIds);
+    return details
+        .map((od) => od.copyWith(status: statusMap[od.orderId] ?? STATUS_UNACCEPTED))
+        .toList()
+      ..sort((a, b) => _timestampToDate(b.createdAt).compareTo(_timestampToDate(a.createdAt)));
+  }
+
+  /// Fetch single detail (compat) plus inject status from parent order.
+  Future<OrderDetail?> getOrderDetailById(String detailsId) async {
+    final doc = await _orderDetailsCol.doc(detailsId).get();
+    if (!doc.exists) return null;
+    final raw = doc.data() as Map<String, dynamic>;
+    final orderId = raw['order_id'] as String? ?? '';
+    int status = STATUS_UNACCEPTED;
+    if (orderId.isNotEmpty) {
+      final orderDoc = await _ordersCol.doc(orderId).get();
+      if (orderDoc.exists) {
+        status = (orderDoc.data() as Map<String, dynamic>)['status'] as int? ?? STATUS_UNACCEPTED;
       }
     }
+    return OrderDetail.fromMap({...raw, 'details_id': doc.id, 'status': status});
+  }
+
+  // ==================== MUTATION METHODS ====================
+
+  /// Accept order (status -2 -> -1). Concurrency safe via transaction.
+  Future<void> acceptOrder(String orderId, String tailorId) async {
+    await _transition(orderId, tailorId, from: STATUS_UNACCEPTED, to: STATUS_ACCEPTED);
+  }
+
+  /// Reject order (status -2 -> -3).
+  Future<void> rejectOrder(String orderId, String tailorId) async {
+    await _transition(orderId, tailorId, from: STATUS_UNACCEPTED, to: STATUS_REJECTED);
+  }
+
+  /// Generic status update without from-state guard (use with caution for future flows).
+  Future<void> updateOrderStatus(String orderId, int newStatus, {Map<String, dynamic> extra = const {}, String? tailorId}) async {
+    final ref = _ordersCol.doc(orderId);
+    await ref.update({
+      'status': newStatus,
+      'updated_at': FieldValue.serverTimestamp(),
+      ...extra,
+      if (tailorId != null) 'tailor_id': tailorId,
+    });
+  }
+
+  // ==================== COMPATIBILITY METHODS FOR EXISTING CUBIT ====================
+
+  /// Existing UI calls tailorAcceptRequest(detailsId,...). Provide shim using detail -> order lookup.
+  Future<void> tailorAcceptRequest({required String detailsId, required String tailorId}) async {
+    final orderId = await _orderIdFromDetail(detailsId);
+    await acceptOrder(orderId, tailorId);
+  }
+
+  /// Existing UI calls tailorRejectRequest(detailsId,...). Provide shim.
+  Future<void> tailorRejectRequest({required String detailsId, required String tailorId}) async {
+    final orderId = await _orderIdFromDetail(detailsId);
+    await rejectOrder(orderId, tailorId);
+  }
+
+  // ==================== STREAMS ====================
+  Stream<List<Map<String, dynamic>>> streamOrdersForTailor(String tailorId, {List<int>? statuses}) {
+    Query base = _ordersCol.where('tailor_id', isEqualTo: tailorId);
+
+    // Helper to map and sort by created_at desc
+    List<Map<String, dynamic>> _mapAndSort(QuerySnapshot snap) {
+      final list = snap.docs.map((d) => _orderDocToMap(d)).toList();
+      list.sort((a, b) => _toDateTime(b['created_at']).compareTo(_toDateTime(a['created_at'])));
+      return list;
+    }
+
+    if (statuses == null || statuses.isEmpty) {
+      return base.snapshots().map(_mapAndSort);
+    }
+    if (statuses.length == 1) {
+      return base.where('status', isEqualTo: statuses.first).snapshots().map(_mapAndSort);
+    }
+    if (statuses.length <= 10) {
+      // Firestore supports whereIn up to 10 items
+      return base.where('status', whereIn: statuses).snapshots().map(_mapAndSort);
+    }
+    // Fallback: client-side filter
+    return base.snapshots().map((snap) {
+      final list = _mapAndSort(snap).where((m) => statuses.contains(m['status'] as int? ?? -999)).toList();
+      return list;
+    });
+  }
+
+  Stream<List<Map<String, dynamic>>> streamOrderDetails(String orderId) {
+    return _orderDetailsCol
+        .where('order_id', isEqualTo: orderId)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => _detailDocToMap(d)).toList());
+  }
+
+  Stream<Map<String, dynamic>?> streamOrder(String orderId) {
+    return _ordersCol.doc(orderId).snapshots().map((snap) => snap.exists ? _orderDocToMap(snap) : null);
+  }
+
+  DateTime _toDateTime(Object? v) {
+    if (v is Timestamp) return v.toDate();
+    if (v is DateTime) return v;
     return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
-  // ==================== READ OPERATIONS ====================
+  // ==================== INTERNAL HELPERS ====================
 
-  /// Get all pending order details for a specific tailor
-  Future<List<OrderDetail>> getPendingOrderDetailsForTailor(String tailorId) async {
-    try {
-      final query = await _orderDetailCollection
-          .where('tailor_id', isEqualTo: tailorId)
-          .get();
-
-      final results = query.docs
-          .map((doc) => OrderDetail.fromMap({
-                ...doc.data() as Map<String, dynamic>,
-                'details_id': doc.id,
-              }))
-          .toList();
-
-      // Sort by created_at descending in code instead of using orderBy
-      results.sort((a, b) => _toDateTime(b.createdAt).compareTo(_toDateTime(a.createdAt)));
-
-      return results;
-    } catch (e) {
-      rethrow;
-    }
+  Map<String, dynamic> _orderDocToMap(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return {
+      ...data,
+      'order_id': doc.id, // ensure order_id present even if stored differently
+    };
   }
 
-  /// Get order detail by ID
-  Future<OrderDetail?> getOrderDetailById(String detailsId) async {
-    try {
-      final doc = await _orderDetailCollection.doc(detailsId).get();
+  Map<String, dynamic> _detailDocToMap(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return {
+      ...data,
+      'details_id': doc.id,
+    };
+  }
 
-      if (doc.exists) {
-        return OrderDetail.fromMap({
-          ...doc.data() as Map<String, dynamic>,
-          'details_id': doc.id,
-        });
+  Future<String> _orderIdFromDetail(String detailsId) async {
+    final d = await _orderDetailsCol.doc(detailsId).get();
+    if (!d.exists) throw Exception('Order detail not found');
+    final data = d.data() as Map<String, dynamic>;
+    final orderId = data['order_id'] as String? ?? '';
+    if (orderId.isEmpty) throw Exception('order_id missing in order detail');
+    return orderId;
+  }
+
+  Future<void> _transition(String orderId, String tailorId, {required int from, required int to}) async {
+    final ref = _ordersCol.doc(orderId);
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) throw Exception('Order not found');
+      final data = snap.data() as Map<String, dynamic>;
+      final current = (data['status'] ?? -999) as int;
+      final existingTailor = (data['tailor_id'] as String?) ?? tailorId; // if not set yet, allow set
+      if (existingTailor.isNotEmpty && existingTailor != tailorId) {
+        // Another tailor already owns it
+        throw Exception('Order assigned to another tailor');
       }
-      return null;
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  /// Get order by ID
-  Future<OrderData?> getOrderById(String orderId) async {
-    try {
-      final doc = await _orderCollection.doc(orderId).get();
-
-      if (doc.exists) {
-        return OrderData.fromMap({
-          ...doc.data() as Map<String, dynamic>,
-          'orderId': doc.id,
-        });
+      if (current != from) {
+        throw Exception('Invalid state transition (expected $from, found $current)');
       }
-      return null;
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  /// Get all orders for a customer
-  Future<List<OrderData>> getOrdersByCustomer(String customerId) async {
-    try {
-      final query = await _orderCollection
-          .where('customerId', isEqualTo: customerId)
-          .get();
-
-      final results = query.docs
-          .map((doc) => OrderData.fromMap({
-                ...doc.data() as Map<String, dynamic>,
-                'orderId': doc.id,
-              }))
-          .toList();
-
-      // Sort by createdAt descending in code
-      results.sort((a, b) => _toDateTime(b.createdAt).compareTo(_toDateTime(a.createdAt)));
-
-      return results;
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  // ==================== UPDATE OPERATIONS ====================
-
-  /// Update order detail status
-  Future<void> updateOrderDetailStatus({
-    required String detailsId,
-    required int newStatus,
-  }) async {
-    try {
-      await _orderDetailCollection.doc(detailsId).update({
-        'status': newStatus,
-        'updated_at': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  /// Update order payment status
-  Future<void> updateOrderPaymentStatus({
-    required String orderId,
-    required String paymentStatus,
-  }) async {
-    try {
-      await _orderCollection.doc(orderId).update({
-        'paymentStatus': paymentStatus,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  // ==================== CREATE OPERATIONS ====================
-
-  /// Create a new order
-  Future<String> createOrder({
-    required String tailorId,
-    required String customerId,
-    required double totalPrice,
-    required String paymentMethod,
-  }) async {
-    try {
-      final doc = await _orderCollection.add({
-        'tailorId': tailorId,
-        'customerId': customerId,
-        'totalPrice': totalPrice,
-        'paymentMethod': paymentMethod,
-        'paymentStatus': 'Pending',
-        'status': -1,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-      return doc.id;
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  /// Create order detail
-  Future<String> createOrderDetail({
-    required String orderId,
-    required String tailorId,
-    required String customerId,
-    required String customerName,
-    required String description,
-    required double price,
-    required String paymentStatus,
-  }) async {
-    try {
-      final doc = await _orderDetailCollection.add({
-        'order_id': orderId,
+      tx.update(ref, {
+        'status': to,
         'tailor_id': tailorId,
-        'customer_id': customerId,
-        'customer_name': customerName,
-        'description': description,
-        'price': price,
-        'totalPrice': price,
-        'paymentStatus': paymentStatus,
-        'status': -1,
-        'created_at': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
       });
+    });
+  }
 
-      return doc.id;
-    } catch (e) {
-      rethrow;
+  Future<Map<String, int>> _bulkFetchStatuses(List<String> orderIds) async {
+    final Map<String, int> map = {};
+    if (orderIds.isEmpty) return map;
+    const chunkSize = 10; // Firestore whereIn limit
+    for (var i = 0; i < orderIds.length; i += chunkSize) {
+      final sub = orderIds.sublist(i, i + chunkSize > orderIds.length ? orderIds.length : i + chunkSize);
+      final snap = await _ordersCol.where(FieldPath.documentId, whereIn: sub).get();
+      for (final d in snap.docs) {
+        map[d.id] = (d.data() as Map<String, dynamic>)['status'] as int? ?? STATUS_UNACCEPTED;
+      }
     }
+    return map;
   }
 
-  // ==================== DELETE OPERATIONS ====================
-
-  /// Delete order detail
-  Future<void> deleteOrderDetail(String detailsId) async {
-    try {
-      await _orderDetailCollection.doc(detailsId).delete();
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  /// Delete order
-  Future<void> deleteOrder(String orderId) async {
-    try {
-      await _orderCollection.doc(orderId).delete();
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  // ==================== TAILOR WORKFLOW OPERATIONS ====================
-  // These methods enforce strict order status transitions per tailor workflow
-
-  /// Status Constants (Tailor-side relevant)
-  static const int STATUS_REQUEST = -2; // New order request from customer
-  static const int STATUS_ACCEPTED_WAITING_RIDER = -1; // Tailor accepted, waiting for customer to book rider
-  static const int STATUS_UNASSIGNED = 0; // Rider not yet assigned
-  static const int STATUS_ASSIGNED = 1; // Rider assigned
-  static const int STATUS_PICKED_FROM_CUSTOMER = 2; // Rider picked up from customer
-  static const int STATUS_DELIVERED_TO_TAILOR = 3; // Order delivered to tailor
-  static const int STATUS_RECEIVED_BY_TAILOR = 4; // Tailor received order
-  static const int STATUS_TAILOR_COMPLETED = 5; // Tailor completed stitching
-  static const int STATUS_DRIVER_REQUESTED = 6; // Tailor requested rider for return
-  static const int STATUS_DRIVER_ASSIGNED = 7; // Driver assigned for return
-  static const int STATUS_PICKED_FROM_TAILOR = 8; // Picked up from tailor for return
-  static const int STATUS_DELIVERED = 9; // Delivered back to customer
-  static const int STATUS_SELF_DELIVERY = 11; // Self-delivered by tailor
-
-  /// Tailor accepts order request
-  /// Transition: status -2 → -1
-  /// Updates: status, accepted_at
-  Future<void> tailorAcceptRequest({
-    required String detailsId,
-    required String tailorId,
-  }) async {
-    try {
-      await FirebaseFirestore.instance.runTransaction((tx) async {
-        final docRef = _orderDetailCollection.doc(detailsId);
-        final snapshot = await tx.get(docRef);
-
-        if (!snapshot.exists) {
-          throw Exception('Order not found');
-        }
-
-        final data = snapshot.data() as Map<String, dynamic>;
-        final currentStatus = (data['status'] ?? -99) as int;
-        final docTailorId = data['tailor_id'] as String?;
-
-        // Validate current status
-        if (currentStatus != STATUS_REQUEST) {
-          throw Exception(
-            'Invalid transition: can only accept when status == $STATUS_REQUEST (current: $currentStatus)',
-          );
-        }
-
-        // Validate tailor ownership
-        if (docTailorId != null && docTailorId != tailorId) {
-          throw Exception('Unauthorized: tailor mismatch');
-        }
-
-        // Update order
-        tx.update(docRef, {
-          'status': STATUS_ACCEPTED_WAITING_RIDER,
-          'accepted_at': FieldValue.serverTimestamp(),
-          'updated_at': FieldValue.serverTimestamp(),
-        });
-      });
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  /// Tailor rejects order request
-  /// This effectively deletes or marks as rejected
-  Future<void> tailorRejectRequest({
-    required String detailsId,
-    required String tailorId,
-  }) async {
-    try {
-      await FirebaseFirestore.instance.runTransaction((tx) async {
-        final docRef = _orderDetailCollection.doc(detailsId);
-        final snapshot = await tx.get(docRef);
-
-        if (!snapshot.exists) {
-          throw Exception('Order not found');
-        }
-
-        final data = snapshot.data() as Map<String, dynamic>;
-        final currentStatus = (data['status'] ?? -99) as int;
-        final docTailorId = data['tailor_id'] as String?;
-
-        // Validate current status
-        if (currentStatus != STATUS_REQUEST) {
-          throw Exception(
-            'Invalid transition: can only reject when status == $STATUS_REQUEST (current: $currentStatus)',
-          );
-        }
-
-        // Validate tailor ownership
-        if (docTailorId != null && docTailorId != tailorId) {
-          throw Exception('Unauthorized: tailor mismatch');
-        }
-
-        // Delete the rejected request (or mark rejected - here we delete)
-        tx.delete(docRef);
-      });
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  /// Tailor presses "Receive Order"
-  /// Transition: status 3 → 4
-  /// Updates: order_status, received_by_tailor, received_at
-  Future<void> tailorReceiveOrder({
-    required String detailsId,
-    required String tailorId,
-  }) async {
-    try {
-      await FirebaseFirestore.instance.runTransaction((tx) async {
-        final docRef = _orderDetailCollection.doc(detailsId);
-        final snapshot = await tx.get(docRef);
-
-        if (!snapshot.exists) {
-          throw Exception('Order not found');
-        }
-
-        final data = snapshot.data() as Map<String, dynamic>;
-        final currentStatus = (data['status'] ?? -1) as int;
-        final docTailorId = data['tailor_id'] as String?;
-
-        // Validate current status
-        if (currentStatus != 3) {
-          throw Exception(
-            'Invalid transition: can only receive when status == 3 (current: $currentStatus)',
-          );
-        }
-
-        // Validate tailor ownership
-        if (docTailorId != null && docTailorId != tailorId) {
-          throw Exception('Unauthorized: tailor mismatch');
-        }
-
-        // Update order
-        tx.update(docRef, {
-          'status': STATUS_RECEIVED_BY_TAILOR,
-          'received_by_tailor': true,
-          'received_at': FieldValue.serverTimestamp(),
-          'updated_at': FieldValue.serverTimestamp(),
-        });
-      });
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  /// Tailor presses "Mark as Completed"
-  /// Transition: status 4 → 5
-  /// Updates: order_status, tailor_completed, completed_at
-  Future<void> tailorMarkCompleted({
-    required String detailsId,
-    required String tailorId,
-  }) async {
-    try {
-      await FirebaseFirestore.instance.runTransaction((tx) async {
-        final docRef = _orderDetailCollection.doc(detailsId);
-        final snapshot = await tx.get(docRef);
-
-        if (!snapshot.exists) {
-          throw Exception('Order not found');
-        }
-
-        final data = snapshot.data() as Map<String, dynamic>;
-        final currentStatus = (data['status'] ?? -1) as int;
-        final docTailorId = data['tailor_id'] as String?;
-
-        // Validate current status
-        if (currentStatus != STATUS_RECEIVED_BY_TAILOR) {
-          throw Exception(
-            'Invalid transition: can only mark completed when status == $STATUS_RECEIVED_BY_TAILOR (current: $currentStatus)',
-          );
-        }
-
-        // Validate tailor ownership
-        if (docTailorId != null && docTailorId != tailorId) {
-          throw Exception('Unauthorized: tailor mismatch');
-        }
-
-        // Update order
-        tx.update(docRef, {
-          'status': STATUS_TAILOR_COMPLETED,
-          'tailor_completed': true,
-          'completed_at': FieldValue.serverTimestamp(),
-          'updated_at': FieldValue.serverTimestamp(),
-        });
-      });
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  /// Tailor presses "Call Driver"
-  /// Transition: status 5 → 6
-  /// Updates: order_status, driver_request_at
-  Future<void> tailorCallDriver({
-    required String detailsId,
-    required String tailorId,
-  }) async {
-    try {
-      await FirebaseFirestore.instance.runTransaction((tx) async {
-        final docRef = _orderDetailCollection.doc(detailsId);
-        final snapshot = await tx.get(docRef);
-
-        if (!snapshot.exists) {
-          throw Exception('Order not found');
-        }
-
-        final data = snapshot.data() as Map<String, dynamic>;
-        final currentStatus = (data['status'] ?? -1) as int;
-        final docTailorId = data['tailor_id'] as String?;
-
-        // Validate current status
-        if (currentStatus != STATUS_TAILOR_COMPLETED) {
-          throw Exception(
-            'Invalid transition: can only request driver when status == $STATUS_TAILOR_COMPLETED (current: $currentStatus)',
-          );
-        }
-
-        // Validate tailor ownership
-        if (docTailorId != null && docTailorId != tailorId) {
-          throw Exception('Unauthorized: tailor mismatch');
-        }
-
-        // Update order
-        tx.update(docRef, {
-          'status': STATUS_DRIVER_REQUESTED,
-          'driver_request_at': FieldValue.serverTimestamp(),
-          'updated_at': FieldValue.serverTimestamp(),
-        });
-      });
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  /// Tailor marks order available for customer self-pickup
-  /// Transition: status 5 → 11
-  /// Updates: order_status, delivered_by, delivered_at
-  Future<void> tailorSelfDeliver({
-    required String detailsId,
-    required String tailorId,
-  }) async {
-    try {
-      await FirebaseFirestore.instance.runTransaction((tx) async {
-        final docRef = _orderDetailCollection.doc(detailsId);
-        final snapshot = await tx.get(docRef);
-
-        if (!snapshot.exists) {
-          throw Exception('Order not found');
-        }
-
-        final data = snapshot.data() as Map<String, dynamic>;
-        final currentStatus = (data['status'] ?? -1) as int;
-        final docTailorId = data['tailor_id'] as String?;
-
-        // Validate current status
-        if (currentStatus != STATUS_TAILOR_COMPLETED) {
-          throw Exception(
-            'Invalid transition: can only self-deliver when status == $STATUS_TAILOR_COMPLETED (current: $currentStatus)',
-          );
-        }
-
-        // Validate tailor ownership
-        if (docTailorId != null && docTailorId != tailorId) {
-          throw Exception('Unauthorized: tailor mismatch');
-        }
-
-        // Update order
-        tx.update(docRef, {
-          'status': STATUS_SELF_DELIVERY,
-          'delivered_by': 'tailor',
-          'delivered_at': FieldValue.serverTimestamp(),
-          'updated_at': FieldValue.serverTimestamp(),
-        });
-      });
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  /// Helper: Check which button should be shown based on current status
-  /// Returns the UI action name or empty string if no button should show
-  static String getButtonVisibility(int status) {
-    switch (status) {
-      case STATUS_REQUEST:
-        return 'Accept / Reject';
-      case STATUS_ACCEPTED_WAITING_RIDER:
-        return 'Waiting for Rider Booking';
-      case STATUS_DELIVERED_TO_TAILOR:
-        return 'Receive Order';
-      case STATUS_RECEIVED_BY_TAILOR:
-        return 'Mark as Completed';
-      case STATUS_TAILOR_COMPLETED:
-        return 'Call Driver / Self Delivery';
-      case STATUS_DRIVER_REQUESTED:
-        return 'Waiting for Driver Assignment';
-      case STATUS_DRIVER_ASSIGNED:
-        return 'Waiting for Driver Pickup';
-      case STATUS_PICKED_FROM_TAILOR:
-        return 'Order Picked Up (disabled)';
-      default:
-        if (status >= STATUS_DELIVERED) {
-          return ''; // Hide all buttons
-        }
-        return '';
-    }
-  }
-
-  /// Validate if tailor can perform an action on this order
-  static bool canTailorActOn(int status) {
-    // Tailor can act on requests, accepted-waiting, and delivery stages
-    return status == STATUS_REQUEST ||
-           status == STATUS_ACCEPTED_WAITING_RIDER ||
-           (status >= STATUS_DELIVERED_TO_TAILOR && status < STATUS_DELIVERED);
-  }
+  DateTime _timestampToDate(Timestamp? ts) => ts?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0);
 }

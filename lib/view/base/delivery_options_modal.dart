@@ -49,32 +49,32 @@ class DeliveryOptionsModal extends StatelessWidget {
     });
   }
 
-  void _handleSelfDelivery(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Self Delivery'),
-        content: const Text('Are you sure you want to deliver this order yourself?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.read<OrderCubit>().tailorSelfDeliver(
-                detailsId: orderDetail.detailsId,
-                tailorId: orderDetail.tailorId,
-              );
-              onDismiss();
-            },
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
-    );
-  }
+  // void _handleSelfDelivery(BuildContext context) {
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text('Self Delivery'),
+  //       content: const Text('Are you sure you want to deliver this order yourself?'),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           child: const Text('Cancel'),
+  //         ),
+  //         TextButton(
+  //           onPressed: () {
+  //             Navigator.pop(context);
+  //             context.read<OrderCubit>().tailorSelfDeliver(
+  //               detailsId: orderDetail.detailsId,
+  //               tailorId: orderDetail.tailorId,
+  //             );
+  //             onDismiss();
+  //           },
+  //           child: const Text('Confirm'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -133,14 +133,14 @@ class DeliveryOptionsModal extends StatelessWidget {
             const SizedBox(height: 16),
 
             // Option 2: Self Delivery
-            _buildOptionCard(
-              title: 'Deliver Myself',
-              description: 'I will deliver this order to the customer',
-              icon: Icons.local_shipping,
-              color: AppColors.deepBrown,
-              onTap: () => _handleSelfDelivery(context),
-            ),
-            const SizedBox(height: 24),
+            // _buildOptionCard(
+            //   title: 'Deliver Myself',
+            //   description: 'I will deliver this order to the customer',
+            //   icon: Icons.local_shipping,
+            //   color: AppColors.deepBrown,
+            //   onTap: () => _handleSelfDelivery(context),
+            // ),
+            // const SizedBox(height: 24),
 
             // Info Box
             Container(
