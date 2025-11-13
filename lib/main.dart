@@ -9,20 +9,23 @@ import 'package:stichanda_tailor/controller/ride_cubit.dart';
 import 'package:stichanda_tailor/data/repository/auth_repo.dart' as auth_repo;
 import 'package:stichanda_tailor/data/repository/order_repo.dart' as order_repo;
 import 'package:stichanda_tailor/data/repository/ride_repo.dart' as ride_repo;
-import 'package:stichanda_tailor/view/screens/login_screen.dart';
-import 'package:stichanda_tailor/view/screens/home_screen.dart';
-import 'package:stichanda_tailor/view/screens/pending_approval_screen.dart';
-import 'package:stichanda_tailor/view/screens/rejected_screen.dart';
 import 'package:stichanda_tailor/view/gate/session_gate.dart';
 // Chat module imports
 import 'package:stichanda_tailor/modules/chat/cubit/chat_cubit.dart';
 import 'package:stichanda_tailor/modules/chat/repository/chat_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ Initialize Firebase
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    // ignore: avoid_print
+    print('Warning: .env not found or failed to load: $e');
+  }
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
