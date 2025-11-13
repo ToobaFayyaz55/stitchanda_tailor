@@ -68,15 +68,12 @@ class RegistrationInProgress extends AuthState {
   List<Object?> get props => [registrationData];
 }
 
-// ==================== CUBIT ====================
 
 class AuthCubit extends Cubit<AuthState> {
   final AuthRepo authRepo;
   Tailor? _registrationData;
 
   AuthCubit({required this.authRepo}) : super(const AuthInitial());
-
-  // ==================== LOGIN ====================
 
   Future<void> login({
     required String email,
@@ -140,6 +137,8 @@ class AuthCubit extends Cubit<AuthState> {
         verification_status: 0,
         address: const TailorAddress(full_address: '', latitude: 0.0, longitude: 0.0),
         image_path: '',
+        cnic_front_image_path: '',
+        cnic_back_image_path: '',
         stripe_account_id: '',
         created_at: Timestamp.now(),
         updated_at: Timestamp.now(),
@@ -200,6 +199,7 @@ class AuthCubit extends Cubit<AuthState> {
   void updateCNIC({
     required int cnicNumber,
     required String imagePath,
+    String? backImagePath,
   }) {
     try {
       if (_registrationData == null) {
@@ -207,7 +207,8 @@ class AuthCubit extends Cubit<AuthState> {
       }
       _registrationData = _registrationData!.copyWith(
         cnic: cnicNumber,
-        image_path: imagePath,
+        cnic_front_image_path: imagePath,
+        cnic_back_image_path: backImagePath ?? '',
       );
       emit(RegistrationInProgress(_registrationData!));
     } catch (e) {
@@ -225,7 +226,6 @@ class AuthCubit extends Cubit<AuthState> {
         throw Exception('All registration steps must be completed');
       }
 
-      // Call repository to handle all registration logic
       final tailor = await authRepo.registerTailor(
         name: _registrationData!.name,
         email: _registrationData!.email,
@@ -236,18 +236,15 @@ class AuthCubit extends Cubit<AuthState> {
         categories: _registrationData!.category,
         experience: _registrationData!.experience,
         cnicNumber: _registrationData!.cnic,
-        imagePath: _registrationData!.image_path,
+        imagePath: _registrationData!.cnic_front_image_path,
         latitude: _registrationData!.address.latitude,
         longitude: _registrationData!.address.longitude,
+        cnicBackPath: _registrationData!.cnic_back_image_path.isEmpty ? null : _registrationData!.cnic_back_image_path,
       );
 
-      // Update registration data with the returned tailor data
       _registrationData = tailor;
-
-      // Emit RegistrationInProgress to show PendingApprovalScreen
       emit(RegistrationInProgress(_registrationData!));
     } catch (e) {
-      // Keep registration data so user can fix and retry
       emit(AuthError(e.toString()));
     }
   }
@@ -309,12 +306,40 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       final state = this.state;
       if (state is! AuthSuccess) throw Exception('Not authenticated');
-      emit(const AuthLoading());
-      final updated = await authRepo.uploadProfileImage(state.tailor.tailor_id, localFilePath);
+      // Avoid global AuthLoading to keep screens intact; rely on local UI progress indicator
+      final currentTailor = state.tailor;
+      // Perform upload
+      final updated = await authRepo.uploadProfileImage(currentTailor.tailor_id, localFilePath);
       emit(AuthSuccess(updated));
     } catch (e) {
+      // Keep previous state if possible
       emit(AuthError('Failed to update profile image: ${e.toString()}'));
     }
   }
 
+  /// Bootstrap existing session: if Firebase user exists fetch tailor doc and emit status-based state
+  Future<void> bootstrapSession() async {
+    try {
+      final user = authRepo.getCurrentUser();
+      if (user == null) {
+        emit(const AuthInitial());
+        return; // no session; stay on login
+      }
+      emit(const AuthLoading());
+      // Force fresh fetch from Firestore (status may have changed)
+      final tailor = await authRepo.fetchTailorById(user.uid);
+      // Map status to state
+      if (tailor.verification_status == 0) {
+        emit(PendingApproval(email: tailor.email, name: tailor.name));
+      } else if (tailor.verification_status == 2) {
+        emit(VerificationRejected(email: tailor.email, name: tailor.name));
+      } else if (tailor.verification_status == 1) {
+        emit(AuthSuccess(tailor));
+      } else {
+        emit(AuthError('Unknown verification status'));
+      }
+    } catch (e) {
+      emit(AuthError('Session bootstrap failed: $e'));
+    }
+  }
 }

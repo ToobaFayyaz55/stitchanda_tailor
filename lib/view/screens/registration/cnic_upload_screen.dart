@@ -52,6 +52,7 @@ class _CnicUploadScreenState extends State<CnicUploadScreen> {
       context.read<AuthCubit>().updateCNIC(
         cnicNumber: int.parse(cnicController.text),
         imagePath: frontImage!.path,
+        backImagePath: backImage?.path,
       );
 
       // Navigate to next screen
@@ -180,4 +181,3 @@ class _CnicUploadScreenState extends State<CnicUploadScreen> {
     );
   }
 }
-

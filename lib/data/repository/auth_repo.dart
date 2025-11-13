@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:stichanda_tailor/data/models/tailor_model.dart';
 import 'package:stichanda_tailor/data/services/stripe_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:stichanda_tailor/helper/upload_image.dart';
 
 class AuthRepo {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
@@ -34,10 +36,25 @@ class AuthRepo {
   /// Upload and set tailor profile image. Accepts a local file path.
   Future<Tailor> uploadProfileImage(String tailorId, String filePath) async {
     try {
-      // Upload to Firebase Storage
-      final ref = _storage.ref().child('tailor_profile/$tailorId/avatar.jpg');
-      await ref.putFile(File(filePath));
-      final imageUrl = await ref.getDownloadURL();
+      // First try Supabase helper
+      String? imageUrl;
+      try {
+        imageUrl = await uploadImageToSupabase(
+          role: 'tailor',
+          uid: tailorId,
+          type: 'avatar',
+          file: XFile(filePath),
+        );
+      } catch (_) {
+        imageUrl = null;
+      }
+
+      // Fallback to Firebase Storage if Supabase not configured or failed
+      if (imageUrl == null || imageUrl.isEmpty) {
+        final ref = _storage.ref().child('tailor_profile/$tailorId/avatar.jpg');
+        await ref.putFile(File(filePath));
+        imageUrl = await ref.getDownloadURL();
+      }
 
       // Update Firestore document
       final docRef = _firestore.collection('tailor').doc(tailorId);
@@ -69,9 +86,10 @@ class AuthRepo {
     required List<String> categories,
     required int experience,
     required int cnicNumber,
-    required String imagePath,
+    required String imagePath, // CNIC front (local path)
     double latitude = 0.0,
     double longitude = 0.0,
+    String? cnicBackPath, // optional CNIC back (local path)
   }) async {
     UserCredential? userCredential;
 
@@ -85,15 +103,53 @@ class AuthRepo {
       final userId = userCredential.user!.uid;
 
       try {
-        // 2. Upload CNIC image to Storage
-        String imageUrl = '';
+        // 2. Upload CNIC images (Supabase first, fallback to Firebase Storage)
+        String cnicFrontUrl = '';
+        String cnicBackUrl = '';
+
         if (imagePath.isNotEmpty) {
           try {
-            final ref = _storage.ref().child('tailor_cnic/$userId/cnic.jpg');
-            await ref.putFile(File(imagePath));
-            imageUrl = await ref.getDownloadURL();
-          } catch (e) {
-            print('Image upload failed: $e');
+            cnicFrontUrl = await uploadImageToSupabase(
+                  role: 'tailor',
+                  uid: userId,
+                  type: 'cnic_front',
+                  file: XFile(imagePath),
+                ) ?? '';
+          } catch (_) {
+            cnicFrontUrl = '';
+          }
+
+          if (cnicFrontUrl.isEmpty) {
+            try {
+              final ref = _storage.ref().child('tailor_cnic/$userId/cnic_front.jpg');
+              await ref.putFile(File(imagePath));
+              cnicFrontUrl = await ref.getDownloadURL();
+            } catch (e) {
+              print('CNIC front upload failed: $e');
+            }
+          }
+        }
+
+        if (cnicBackPath != null && cnicBackPath.isNotEmpty) {
+          try {
+            cnicBackUrl = await uploadImageToSupabase(
+                  role: 'tailor',
+                  uid: userId,
+                  type: 'cnic_back',
+                  file: XFile(cnicBackPath),
+                ) ?? '';
+          } catch (_) {
+            cnicBackUrl = '';
+          }
+
+          if (cnicBackUrl.isEmpty) {
+            try {
+              final refBack = _storage.ref().child('tailor_cnic/$userId/cnic_back.jpg');
+              await refBack.putFile(File(cnicBackPath));
+              cnicBackUrl = await refBack.getDownloadURL();
+            } catch (e) {
+              print('CNIC back upload failed: $e');
+            }
           }
         }
 
@@ -112,13 +168,17 @@ class AuthRepo {
           is_verified: false,
           verification_status: 0, // 0 = pending
           address: TailorAddress(full_address: fullAddress, latitude: latitude, longitude: longitude),
-          image_path: imageUrl,
+          image_path: '', // profile avatar intentionally empty at registration
+          cnic_front_image_path: cnicFrontUrl,
+          cnic_back_image_path: cnicBackUrl,
           stripe_account_id: '',
           created_at: Timestamp.now(),
           updated_at: Timestamp.now(),
         );
 
-        await _firestore.collection('tailor').doc(userId).set(tailor.toMap());
+        await _firestore.collection('tailor').doc(userId).set({
+          ...tailor.toMap(),
+        });
 
         // 4. Attempt to create Stripe connected account (non-blocking failure)
         final stripeId = await StripeService.createConnectedAccount(email: email);
@@ -196,8 +256,7 @@ class AuthRepo {
         return Tailor.fromMap({
           ...doc.data() as Map<String, dynamic>,
           'tailor_id': userId,
-        }
-        );
+        });
       } else {
         throw Exception('Tailor profile not found');
       }
@@ -223,5 +282,11 @@ class AuthRepo {
   /// Check if user is logged in
   bool isLoggedIn() {
     return _firebaseAuth.currentUser != null;
+  }
+
+  Future<Tailor> fetchTailorById(String tailorId) async {
+    final doc = await _firestore.collection('tailor').doc(tailorId).get();
+    if (!doc.exists) throw Exception('Tailor not found');
+    return Tailor.fromMap({...doc.data() as Map<String,dynamic>, 'tailor_id': tailorId});
   }
 }

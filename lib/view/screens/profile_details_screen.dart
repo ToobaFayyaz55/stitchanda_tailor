@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
-import 'package:stichanda_tailor/data/models/tailor_model.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ProfileDetailsScreen extends StatelessWidget {
   const ProfileDetailsScreen({super.key});
@@ -201,39 +201,89 @@ class ProfileDetailsScreen extends StatelessWidget {
 }
 
 // Profile Avatar + Name from Firebase
-class _DetailHeader extends StatelessWidget {
+class _DetailHeader extends StatefulWidget {
   final dynamic tailor;
-
   const _DetailHeader({required this.tailor});
 
   @override
+  State<_DetailHeader> createState() => _DetailHeaderState();
+}
+
+class _DetailHeaderState extends State<_DetailHeader> {
+  bool _uploading = false;
+
+  Future<void> _pickAndUpload() async {
+    final messenger = ScaffoldMessenger.maybeOf(context); // capture early to avoid context issues after dispose
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 75);
+    if (picked == null) return;
+    if (!mounted) return;
+    setState(() => _uploading = true);
+    try {
+      await context.read<AuthCubit>().updateProfileImage(picked.path);
+      if (mounted && messenger != null) {
+        messenger.showSnackBar(const SnackBar(content: Text('Profile image updated')));
+      }
+    } catch (e) {
+      if (mounted && messenger != null) {
+        messenger.showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final tailor = widget.tailor;
     return Center(
       child: Column(
         children: [
           Stack(
-            alignment: Alignment.bottomRight,
+            alignment: Alignment.center,
             children: [
-              CircleAvatar(
-                radius: 40,
-                backgroundColor: AppColors.beige,
-                child: Icon(
-                  Icons.person,
-                  size: 50,
-                  color: AppColors.deepBrown,
+              GestureDetector(
+                onTap: _uploading ? null : _pickAndUpload,
+                child: CircleAvatar(
+                  key: ValueKey(tailor.image_path),
+                  radius: 40,
+                  backgroundColor: AppColors.beige,
+                  backgroundImage: (tailor.image_path is String && tailor.image_path.isNotEmpty)
+                      ? NetworkImage('${tailor.image_path}?v=${DateTime.now().millisecondsSinceEpoch}')
+                      : null,
+                  child: (tailor.image_path == null || tailor.image_path.isEmpty)
+                      ? const Icon(
+                          Icons.person,
+                          size: 50,
+                          color: AppColors.deepBrown,
+                        )
+                      : null,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: AppColors.caramel,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.surface, width: 2),
-                ),
-                child: const Icon(
-                  Icons.edit_outlined,
-                  color: Colors.white,
-                  size: 14,
+              Positioned(
+                bottom: 4,
+                right: 4,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppColors.caramel,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.surface, width: 2),
+                  ),
+                  child: _uploading
+                      ? const SizedBox(
+                          height: 14,
+                          width: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Icon(
+                          Icons.edit_outlined,
+                          color: Colors.white,
+                          size: 14,
+                        ),
                 ),
               ),
             ],
@@ -247,7 +297,11 @@ class _DetailHeader extends StatelessWidget {
                 .copyWith(fontWeight: FontWeight.w600),
           ),
           Text(
-            tailor.verification_status == 1 ? 'Verified' : tailor.verification_status == 0 ? 'Pending Approval' : 'Rejected',
+            tailor.verification_status == 1
+                ? 'Verified'
+                : tailor.verification_status == 0
+                    ? 'Pending Approval'
+                    : 'Rejected',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],

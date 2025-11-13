@@ -10,9 +10,14 @@ import 'package:stichanda_tailor/data/repository/auth_repo.dart' as auth_repo;
 import 'package:stichanda_tailor/data/repository/order_repo.dart' as order_repo;
 import 'package:stichanda_tailor/data/repository/ride_repo.dart' as ride_repo;
 import 'package:stichanda_tailor/view/screens/login_screen.dart';
+import 'package:stichanda_tailor/view/screens/home_screen.dart';
+import 'package:stichanda_tailor/view/screens/pending_approval_screen.dart';
+import 'package:stichanda_tailor/view/screens/rejected_screen.dart';
+import 'package:stichanda_tailor/view/gate/session_gate.dart';
 // Chat module imports
 import 'package:stichanda_tailor/modules/chat/cubit/chat_cubit.dart';
 import 'package:stichanda_tailor/modules/chat/repository/chat_repository.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +25,10 @@ void main() async {
   // ✅ Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+  await Supabase.initialize(
+    url: 'https://rzkrwgexdqksrudynxvp.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6a3J3Z2V4ZHFrc3J1ZHlueHZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3MTUxNjAsImV4cCI6MjA3NzI5MTE2MH0.bQytv6utSf9ArstDr6nu1K5L66XuFj5vTBYiWSR-xRw',
   );
 
   runApp(const MyApp());
@@ -50,7 +59,7 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'Stichanda Tailor',
         theme: buildAppTheme(),
-        home: const LoginScreen(),
+        home: const SessionGate(),
       ),
     );
   }

@@ -33,32 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: BlocConsumer<AuthCubit, AuthState>(
           listener: (context, state) {
-            if (state is AuthSuccess) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const HomeScreen()),
-              );
-            } else if (state is PendingApproval) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PendingApprovalScreen(
-                    email: state.email,
-                    name: state.name,
-                  ),
-                ),
-              );
-            } else if (state is VerificationRejected) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => RejectedScreen(
-                    email: state.email,
-                    name: state.name,
-                  ),
-                ),
-              );
-            } else if (state is AuthError) {
+            if (state is AuthError) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(state.message),
@@ -66,6 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               );
             }
+            // Do not navigate here; SessionGate rebuild will switch screens
           },
           builder: (context, state) {
             bool isLoading = state is AuthLoading;
@@ -187,6 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     email: emailController.text,
                                     password: passwordController.text,
                                   );
+                              // No navigation here; SessionGate will rebuild to target screen
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.caramel,

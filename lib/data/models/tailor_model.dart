@@ -43,7 +43,9 @@ class Tailor {
   final bool is_verified;
   final int verification_status; // 0 | 1 | 2
   final TailorAddress address;
-  final String image_path;
+  final String image_path; // profile avatar only
+  final String cnic_front_image_path; // new field
+  final String cnic_back_image_path; // new field
   final String stripe_account_id; // non-null, empty if not yet created
   final Timestamp created_at;
   final Timestamp updated_at;
@@ -63,6 +65,8 @@ class Tailor {
     required this.verification_status,
     required this.address,
     required this.image_path,
+    required this.cnic_front_image_path,
+    required this.cnic_back_image_path,
     required this.stripe_account_id,
     required this.created_at,
     required this.updated_at,
@@ -93,6 +97,8 @@ class Tailor {
       verification_status: map['verification_status'] as int? ?? map['verification_status'] as int? ?? 0,
       address: TailorAddress.fromMap(addressMap),
       image_path: map['image_path'] as String? ?? '',
+      cnic_front_image_path: map['cnic_front_image_path'] as String? ?? map['cnic_front_url'] as String? ?? '',
+      cnic_back_image_path: map['cnic_back_image_path'] as String? ?? map['cnic_back_url'] as String? ?? '',
       stripe_account_id: map['stripe_account_id'] as String? ?? '',
       created_at: map['created_at'] is Timestamp ? map['created_at'] as Timestamp : Timestamp.now(),
       updated_at: map['updated_at'] is Timestamp ? map['updated_at'] as Timestamp : Timestamp.now(),
@@ -114,6 +120,8 @@ class Tailor {
         'verification_status': verification_status,
         'address': address.toMap(),
         'image_path': image_path,
+        'cnic_front_image_path': cnic_front_image_path,
+        'cnic_back_image_path': cnic_back_image_path,
         'stripe_account_id': stripe_account_id,
         'created_at': created_at,
         'updated_at': updated_at,
@@ -134,6 +142,8 @@ class Tailor {
     int? verification_status,
     TailorAddress? address,
     String? image_path,
+    String? cnic_front_image_path,
+    String? cnic_back_image_path,
     String? stripe_account_id,
     Timestamp? created_at,
     Timestamp? updated_at,
@@ -153,6 +163,8 @@ class Tailor {
       verification_status: verification_status ?? this.verification_status,
       address: address ?? this.address,
       image_path: image_path ?? this.image_path,
+      cnic_front_image_path: cnic_front_image_path ?? this.cnic_front_image_path,
+      cnic_back_image_path: cnic_back_image_path ?? this.cnic_back_image_path,
       stripe_account_id: stripe_account_id ?? this.stripe_account_id,
       created_at: created_at ?? this.created_at,
       updated_at: updated_at ?? this.updated_at,

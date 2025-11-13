@@ -4,7 +4,6 @@ import 'package:stichanda_tailor/controller/order_cubit.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
 import 'package:stichanda_tailor/data/models/order_detail_model.dart';
 import 'package:stichanda_tailor/data/models/verification_status.dart';
-import 'package:stichanda_tailor/data/models/tailor_model.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import '../base/custom_bottom_nav_bar.dart';
 import 'orders_screen.dart';
@@ -38,43 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Home Screen', style: TextStyle(color: AppColors.textBlack)),
         backgroundColor: AppColors.caramel,
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.red),
-            onPressed: () {
-              showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Confirm Logout'),
-                  content: const Text('Are you sure you want to logout?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(false),
-                      child: const Text('Cancel'),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8.0),
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.of(ctx).pop(true),
-                        child: const Text('Logout'),
-                      ),
-                    ),
-                  ],
-                ),
-              ).then((confirmed) async {
-                if (confirmed == true) {
-                  await context.read<AuthCubit>().logout();
-                  if (mounted) {
-                    Navigator.of(context).pushNamedAndRemoveUntil(
-                      '/login',
-                      (Route<dynamic> route) => false,
-                    );
-                  }
-                }
-              });
-            },
-          ),
-        ],
+        // removed logout action; logout should be in profile screen only
       ),
       body: SafeArea(
         child: BlocListener<AuthCubit, AuthState>(
@@ -182,11 +145,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               Switch(
                                 value: (authState is AuthSuccess) ? authState.tailor.availibility_status : true,
                                 onChanged: (v) {
-                                  // call cubit to persist availability
                                   context.read<AuthCubit>().updateAvailability(v);
                                 },
-                                activeThumbColor: AppColors.caramel,
-                                activeTrackColor: const Color.fromRGBO(216, 150, 75, 0.3),
+                                thumbColor: WidgetStateProperty.resolveWith((states) => AppColors.caramel),
+                                trackColor: WidgetStateProperty.resolveWith((states) => const Color.fromRGBO(216, 150, 75, 0.3)),
                               ),
                           ],
                         ),

@@ -5,8 +5,9 @@ import 'package:stichanda_tailor/view/base/custom_bottom_nav_bar.dart';
 import 'package:stichanda_tailor/view/screens/profile_details_screen.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
 import 'package:stichanda_tailor/data/models/verification_status.dart';
-import 'package:stichanda_tailor/data/models/tailor_model.dart';
 import 'package:image_picker/image_picker.dart';
+
+import '../gate/session_gate.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -92,9 +93,12 @@ class ProfileScreen extends StatelessWidget {
                                     ),
                                     padding: const EdgeInsets.all(4),
                                     child: CircleAvatar(
+                                      key: ValueKey(tailor.image_path),
                                       radius: avatarRadius,
                                       backgroundColor: AppColors.beige,
-                                      backgroundImage: tailor.image_path.isNotEmpty ? NetworkImage(tailor.image_path) : null,
+                                      backgroundImage: tailor.image_path.isNotEmpty
+                                          ? NetworkImage('${tailor.image_path}?v=${DateTime.now().millisecondsSinceEpoch}')
+                                          : null,
                                       child: tailor.image_path.isEmpty ? Icon(Icons.person, size: avatarRadius, color: AppColors.deepBrown) : null,
                                     ),
                                   ),
@@ -248,11 +252,16 @@ class ProfileScreen extends StatelessWidget {
                                           ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Logout')),
                                         ],
                                       ),
-                                    ).then((confirmed) {
+                                    ).then((confirmed) async {
                                       if (confirmed == true) {
-                                        context.read<AuthCubit>().logout();
+                                        await context.read<AuthCubit>().logout();
+                                        if (!context.mounted) return;
                                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You have been logged out')));
-                                        Navigator.pushReplacementNamed(context, '/login');
+                                        Navigator.pushAndRemoveUntil(
+                                          context,
+                                          MaterialPageRoute(builder: (_) => const SessionGate()),
+                                          (route) => false,
+                                        );
                                       }
                                     });
                                   },
@@ -290,12 +299,13 @@ class ProfileScreen extends StatelessWidget {
                   const Text('Unable to load profile'),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       // Retry by navigating back to login
-                      context.read<AuthCubit>().logout();
-                      Navigator.pushNamedAndRemoveUntil(
+                      await context.read<AuthCubit>().logout();
+                      if (!context.mounted) return;
+                      Navigator.pushAndRemoveUntil(
                         context,
-                        '/login',
+                        MaterialPageRoute(builder: (_) => const SessionGate()),
                         (Route<dynamic> route) => false,
                       );
                     },
