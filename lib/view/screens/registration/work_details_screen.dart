@@ -24,14 +24,18 @@ class _WorkDetailsScreenState extends State<WorkDetailsScreen> {
     "5+"
   ];
 
-  final List<String> specializationOptions = ["male", "female", "both"];
+  final List<String> specializationOptions = ["male", "female", "kids"];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Tailor Registration"),
-        backgroundColor: AppColors.caramel,
+        title: const Text(
+            "Registration",
+            style: TextStyle(
+                fontSize: 20
+            )
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -83,27 +87,69 @@ class _WorkDetailsScreenState extends State<WorkDetailsScreen> {
                     color: AppColors.deepBrown,
                   ),
                 ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 10,
+                const SizedBox(height: 15),
+                Column(
                   children: specializationOptions.map((item) {
                     final isSelected = selectedSpecialties.contains(item);
-                    return ChoiceChip(
-                      label: Text(item),
-                      selected: isSelected,
-                      selectedColor: AppColors.caramel,
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : AppColors.deepBrown,
+                    final displayName = item.substring(0, 1).toUpperCase() + item.substring(1);
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            if (isSelected) {
+                              selectedSpecialties.remove(item);
+                            } else {
+                              selectedSpecialties.add(item);
+                            }
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isSelected ? AppColors.caramel : AppColors.outline,
+                              width: isSelected ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppColors.caramel : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: isSelected ? AppColors.caramel : AppColors.outline,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: isSelected
+                                    ? const Icon(
+                                        Icons.check,
+                                        size: 16,
+                                        color: Colors.white,
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                displayName,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: isSelected ? AppColors.deepBrown : AppColors.textGrey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      onSelected: (selected) {
-                        setState(() {
-                          if (selected) {
-                            selectedSpecialties.add(item);
-                          } else {
-                            selectedSpecialties.remove(item);
-                          }
-                        });
-                      },
                     );
                   }).toList(),
                 ),

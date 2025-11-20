@@ -73,7 +73,13 @@ flutter:
   assets:
     - assets/images/logo.png
     - assets/images/logo2.png
+    - assets/images/Tailor_reg.png
     - .env
+
+  fonts:
+    - family: IMFellDWPica
+      fonts:
+        - asset: assets/fonts/IMFellDWPica-Regular.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

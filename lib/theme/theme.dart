@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 
 /// 🎨 Main Color Palette (from your Figma UI)
 class AppColors {
-  static const Color caramel = Color(0xFFD8964B); // main accent button color
+  static const Color caramel = Color(0xFFD49649); // main accent button color
   static const Color gold = Color(0xFFDEA666); // lighter gold tone
   static const Color beige = Color(0xFFE6BA88); // secondary soft tone
   static const Color deepBrown = Color(0xFF8E7051); // text & icon color
   static const Color chocolate = Color(0xFF5B4632); // darker brown for accents
+  static const Color grey = Color(0xFFE5E7EB); // grey for accents
+  static const Color darkgrey = Color(0xFF757575); // darker grey for accents
+  static const Color green = Color(0xFF43A047); // darker green for accents
 
   static const Color background = Color(0xFFFFFDF9); // creamy white background
   static const Color surface = Color(0xFFFFFFFF); // card & field background

@@ -100,8 +100,12 @@ class _CnicUploadScreenState extends State<CnicUploadScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Verification"),
-        backgroundColor: AppColors.caramel,
+        title: const Text(
+            "Verification",
+            style: TextStyle(
+                fontSize: 20
+            )
+        ),
       ),
       body: SafeArea(
         child: Padding(

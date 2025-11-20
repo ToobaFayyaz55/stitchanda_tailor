@@ -147,7 +147,14 @@ class _LocationSelectionScreenState extends State<LocationSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Tailor Registration"), backgroundColor: AppColors.caramel),
+      appBar: AppBar(
+        title: const Text(
+            "Registration",
+            style: TextStyle(
+                fontSize: 20
+            )
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),

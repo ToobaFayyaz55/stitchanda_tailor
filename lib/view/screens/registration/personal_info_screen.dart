@@ -18,7 +18,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   final emailController = TextEditingController();
   final phoneController = TextEditingController();
 
-  String gender = "male"; // default selected
+  String gender = "Male"; // default selected
 
   @override
   void dispose() {
@@ -31,162 +31,268 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Tailor Registration"),
-        backgroundColor: AppColors.caramel,
-      ),
+      backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          children: [
+            // Decorative Header Section
+            Stack(
               children: [
-                const Text(
-                  "Personal Information",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.deepBrown,
-                  ),
-                ),
-                const SizedBox(height: 25),
-
-                // Full Name
-                TextFormField(
-                  controller: fullNameController,
-                  decoration: const InputDecoration(
-                    labelText: "Full Name",
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                  validator: (v) =>
-                  v!.isEmpty ? "Please enter your full name" : null,
-                ),
-                const SizedBox(height: 15),
-
-                // Email
-                TextFormField(
-                  controller: emailController,
-                  decoration: const InputDecoration(
-                    labelText: "Email",
-                    prefixIcon: Icon(Icons.email_outlined),
-                  ),
-                  validator: (v) => v!.contains("@")
-                      ? null
-                      : "Please enter a valid email address",
-                ),
-                const SizedBox(height: 15),
-
-                // Phone Number
-                TextFormField(
-                  controller: phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: "Phone Number",
-                    prefixIcon: Icon(Icons.phone_outlined),
-                  ),
-                  validator: (v) => v!.length < 10
-                      ? "Please enter a valid phone number"
-                      : null,
-                ),
-                const SizedBox(height: 15),
-
-                // Gender
-                const Text(
-                  "Gender",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.deepBrown,
-                  ),
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Radio<String>(
-                            activeColor: AppColors.caramel,
-                            value: "male",
-                            groupValue: gender,
-                            onChanged: (value) {
-                              setState(() {
-                                gender = value ?? "male";
-                              });
-                            },
-                          ),
-                          const Text("Male"),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Radio<String>(
-                            activeColor: AppColors.caramel,
-                            value: "female",
-                            groupValue: gender,
-                            onChanged: (value) {
-                              setState(() {
-                                gender = value ?? "male";
-                              });
-                            },
-                          ),
-                          const Text("Female"),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 15),
-
-                // Address - NOTE: Address and location will be captured in LocationSelectionScreen
-                // This allows GPS-based location capture with latitude and longitude
-
-                const SizedBox(height: 40),
-
-                // Continue Button
-                SizedBox(
+                // Full Background Image
+                Container(
                   width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.caramel,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                  height: 225,
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(24),
+                      bottomRight: Radius.circular(24),
                     ),
-                    onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        // Save personal info to AuthCubit
-                        // Note: Address and location will be captured in LocationSelectionScreen
-                        context.read<AuthCubit>().updatePersonalInfo(
-                          name: fullNameController.text.trim(),
-                          email: emailController.text.trim(),
-                          phone: phoneController.text.trim(),
-                          gender: gender,
-                        );
+                    image: DecorationImage(
+                      image: const AssetImage('assets/images/Tailor_reg.png'),
+                      fit: BoxFit.cover, // makes the image fill entire header
+                    ),
+                  ),
+                ),
 
-                        // Navigate to next screen
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const WorkDetailsScreen(),
-                          ),
-                        );
-                      }
-                    },
-                    child: const Text(
-                      "Continue",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
+                // Dark overlay (optional — helps text visibility)
+                Container(
+                  width: double.infinity,
+                  height: 225,
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(24),
+                      bottomRight: Radius.circular(24),
                     ),
+                    color: Colors.black.withOpacity(0),
+                  ),
+                ),
+
+                // Text + layout
+                Positioned.fill(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Start Your Tailoring\nJourney with\nStitchanda",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontFamily: 'IMFellDWPica',
+                            color: AppColors.textBlack.withOpacity(0.7),
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Close Button
+                Positioned(
+                  top: 10,
+                  left: 10,
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: AppColors.deepBrown),
+                    onPressed: () => Navigator.pop(context),
                   ),
                 ),
               ],
             ),
-          ),
+
+            // Form Section
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      // Full Name
+                      TextFormField(
+                        controller: fullNameController,
+                        decoration: InputDecoration(
+                          hintText: "Full Name",
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.caramel,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        validator: (v) =>
+                            v!.isEmpty ? "Please enter your full name" : null,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Email
+                      TextFormField(
+                        controller: emailController,
+                        decoration: InputDecoration(
+                          hintText: "Email",
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.caramel,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        validator: (v) => v!.contains("@")
+                            ? null
+                            : "Please enter a valid email address",
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Phone Number
+                      TextFormField(
+                        controller: phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          hintText: "Phone Number",
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.caramel,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        validator: (v) => v!.length < 10
+                            ? "Please enter a valid phone number"
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Gender Dropdown
+                      DropdownButtonFormField<String>(
+                        initialValue: gender,
+                        decoration: InputDecoration(
+                          hintText: "Gender",
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.caramel,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: "Male", child: Text("Male")),
+                          DropdownMenuItem(value: "Female", child: Text("Female")),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            gender = value ?? "Male";
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Continue Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.caramel,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
+                            if (_formKey.currentState!.validate()) {
+                              // Save personal info to AuthCubit
+                              context.read<AuthCubit>().updatePersonalInfo(
+                                    name: fullNameController.text.trim(),
+                                    email: emailController.text.trim(),
+                                    phone: phoneController.text.trim(),
+                                    gender: gender,
+                                  );
+
+                              // Navigate to next screen
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const WorkDetailsScreen(),
+                                ),
+                              );
+                            }
+                          },
+                          child: const Text(
+                            "Continue",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
