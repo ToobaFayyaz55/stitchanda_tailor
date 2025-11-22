@@ -25,7 +25,7 @@ class CustomBottomNavBar extends StatelessWidget {
       case 1:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const RequestsScreen()),
+          MaterialPageRoute(builder: (context) => const ProfileScreen()),
         );
         break;
 
@@ -39,14 +39,14 @@ class CustomBottomNavBar extends StatelessWidget {
       case 3:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const ProfileScreen()),
+          MaterialPageRoute(builder: (context) => const OrdersScreen()),
         );
         break;
 
       case 4:
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const OrdersScreen()),
+          MaterialPageRoute(builder: (context) => const RequestsScreen()),
         );
         break;
     }
@@ -66,12 +66,12 @@ class CustomBottomNavBar extends StatelessWidget {
         BottomNavigationBarItem(
             icon: Icon(Icons.chat_bubble_outline), label: 'Chat'),
         BottomNavigationBarItem(
-            icon: Icon(Icons.mail_outline), label: 'Requests'),
+            icon: Icon(Icons.person_outline), label: 'Profile'),
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
         BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline), label: 'Profile'),
-        BottomNavigationBarItem(
             icon: Icon(Icons.list_alt), label: 'Orders'),
+        BottomNavigationBarItem(
+            icon: Icon(Icons.mail_outline), label: 'Requests'),
       ],
     );
   }

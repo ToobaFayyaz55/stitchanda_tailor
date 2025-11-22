@@ -7,8 +7,6 @@ import 'package:stichanda_tailor/data/models/verification_status.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import '../base/custom_bottom_nav_bar.dart';
 import 'orders_screen.dart';
-import 'package:stichanda_tailor/modules/chat/cubit/chat_cubit.dart';
-import 'package:stichanda_tailor/modules/chat/screens/chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -27,6 +25,18 @@ class _HomeScreenState extends State<HomeScreen> {
       context.read<OrderCubit>().fetchPendingOrderDetailsForTailor(
             authState.tailor.tailor_id,
           );
+    }
+  }
+
+  // Helper method to parse dueData string to DateTime
+  DateTime _parseDueData(String? dueData) {
+    if (dueData == null || dueData.isEmpty) {
+      return DateTime.fromMillisecondsSinceEpoch(8640000000000000); // far future date for nulls
+    }
+    try {
+      return DateTime.parse(dueData);
+    } catch (e) {
+      return DateTime.fromMillisecondsSinceEpoch(8640000000000000);
     }
   }
 
@@ -71,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
               final activeOrders = allOrders.where((o) => o.status == -1).length;
               final completedOrders = allOrders.where((o) => o.status == 2).length;
               final avgRating = (authState is AuthSuccess) ? authState.tailor.review.toDouble() : 0.0;
-              final earnings = allOrders.fold<double>(0.0, (sum, o) => sum + (o.totalPrice));
+              final earnings = allOrders.fold<double>(0.0, (sum, o) => sum + (o.totalPrice ?? 0.0));
 
               if (state is OrderLoading) {
                 return const Center(child: CircularProgressIndicator());
@@ -229,10 +239,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       // Filter in-progress statuses (0,1)
                       final inProgress = allOrders.where((o) => o.status == 0 || o.status == 1).toList();
 
-                      // Sort by dueDate ascending (nulls last)
+                      // Sort by dueData ascending (nulls last)
                       inProgress.sort((a, b) {
-                        final aDue = a.dueDate ?? DateTime.fromMillisecondsSinceEpoch(8640000000000000);
-                        final bDue = b.dueDate ?? DateTime.fromMillisecondsSinceEpoch(8640000000000000);
+                        // Parse dueData string to DateTime for comparison
+                        final aDue = _parseDueData(a.dueData);
+                        final bDue = _parseDueData(b.dueData);
                         return aDue.compareTo(bDue);
                       });
 
@@ -381,33 +392,12 @@ class OrderDetailCard extends StatelessWidget {
   }
 
   void _openChat(BuildContext context) async {
-    final authState = context.read<AuthCubit>().state;
-    if (authState is! AuthSuccess) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please login again to use chat')),
-      );
-      return;
-    }
-    final me = authState.tailor.tailor_id;
-    final other = orderDetail.customerId;
-    if (other.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Customer id unavailable for this order')),
-      );
-      return;
-    }
-    try {
-      final conv = await context.read<ChatCubit>().startConversation(me, other);
-      // ignore: use_build_context_synchronously
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => ChatScreen(conversation: conv)),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to start chat: $e')),
-      );
-    }
+    // Customer ID is not available in OrderDetail model
+    // This would need to fetch the parent order to get customer_id
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Chat feature requires order update')),
+    );
+    return;
   }
 
   @override
@@ -480,7 +470,7 @@ class OrderDetailCard extends StatelessWidget {
 
             // Description
             Text(
-              orderDetail.description,
+              orderDetail.description ?? 'No description',
               style: const TextStyle(
                 fontSize: 14,
                 color: AppColors.textBlack,
@@ -490,7 +480,7 @@ class OrderDetailCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Footer with price and payment status
+            // Footer with price and due date
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -498,24 +488,24 @@ class OrderDetailCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Price: Rs. ${orderDetail.totalPrice}',
+                      'Price: Rs. ${orderDetail.totalPrice ?? orderDetail.price}',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                         color: AppColors.caramel,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Payment: ${orderDetail.paymentStatus}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: orderDetail.paymentStatus == 'Pending'
-                            ? Colors.orange
-                            : Colors.green,
-                        fontWeight: FontWeight.w600,
+                    if (orderDetail.dueData != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Due: ${orderDetail.dueData}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textGrey,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
                 ElevatedButton(

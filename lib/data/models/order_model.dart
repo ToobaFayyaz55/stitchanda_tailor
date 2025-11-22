@@ -10,6 +10,7 @@ class OrderData {
   final List<OrderItemData>? orderDetails;
   final Timestamp? createdAt;
   final Timestamp? updatedAt;
+  final int status;
 
   OrderData({
     required this.orderId,
@@ -18,6 +19,7 @@ class OrderData {
     required this.totalPrice,
     required this.paymentMethod,
     required this.paymentStatus,
+    required this.status,
     this.orderDetails,
     this.createdAt,
     this.updatedAt,
@@ -31,6 +33,7 @@ class OrderData {
       totalPrice: (map['totalPrice'] as num?)?.toDouble() ?? 0.0,
       paymentMethod: map['paymentMethod'] as String? ?? 'Cash',
       paymentStatus: map['paymentStatus'] as String? ?? 'Pending',
+      status: map['status'] as int? ?? 0,
       orderDetails: map['orderDetails'] != null
           ? List<OrderItemData>.from(
               (map['orderDetails'] as List).map(
@@ -54,6 +57,7 @@ class OrderData {
       'orderDetails': orderDetails?.map((item) => item.toMap()).toList(),
       'createdAt': createdAt,
       'updatedAt': updatedAt,
+      'status': status,
     };
   }
 
@@ -67,6 +71,7 @@ class OrderData {
     List<OrderItemData>? orderDetails,
     Timestamp? createdAt,
     Timestamp? updatedAt,
+    int? status,
   }) {
     return OrderData(
       orderId: orderId ?? this.orderId,
@@ -78,12 +83,13 @@ class OrderData {
       orderDetails: orderDetails ?? this.orderDetails,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      status: status ?? this.status,
     );
   }
 
   @override
   String toString() =>
-      'OrderData(orderId: $orderId, status: $paymentStatus, totalPrice: $totalPrice)';
+      'OrderData(orderId: $orderId, status: $status, totalPrice: $totalPrice)';
 }
 
 class OrderItemData {

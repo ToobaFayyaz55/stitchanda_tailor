@@ -96,7 +96,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
                 },
               ),
       ),
-      bottomNavigationBar: const CustomBottomNavBar(activeIndex: 1),
+      bottomNavigationBar: const CustomBottomNavBar(activeIndex: 4),
     );
   }
 }

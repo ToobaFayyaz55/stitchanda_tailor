@@ -322,7 +322,7 @@ class ProfileScreen extends StatelessWidget {
       ),
 
       // Profile Tab Active
-      bottomNavigationBar: const CustomBottomNavBar(activeIndex: 3),
+      bottomNavigationBar: const CustomBottomNavBar(activeIndex: 1),
     );
   }
 }

@@ -4,17 +4,15 @@ class OrderDetail {
   final String detailsId;
   final String orderId;
   final String tailorId;
-  final String customerId;
   final String customerName;
-  final String description;
-  final double price;
-  final double totalPrice;
-  final String paymentMethod;
-  final String paymentStatus;
-  final int status; // -1, 0, 1, 2, etc.
-  final DateTime? dueDate;
+  final String? description;
+  final String? imagePath;
   final Fabric? fabric;
   final Measurements? measurements;
+  final double price;
+  final double? totalPrice;
+  final String? dueData; // Note: Firebase has "due_data" - keeping as-is from schema
+  final int status; // -1, 0, 1, 2, etc.
   final List<OrderItem>? orderDetails;
   final Timestamp? createdAt;
   final Timestamp? updatedAt;
@@ -23,17 +21,15 @@ class OrderDetail {
     required this.detailsId,
     required this.orderId,
     required this.tailorId,
-    required this.customerId,
     required this.customerName,
-    required this.description,
-    required this.price,
-    required this.totalPrice,
-    required this.paymentMethod,
-    required this.paymentStatus,
-    required this.status,
-    this.dueDate,
+    this.description,
+    this.imagePath,
     this.fabric,
     this.measurements,
+    required this.price,
+    this.totalPrice,
+    this.dueData,
+    required this.status,
     this.orderDetails,
     this.createdAt,
     this.updatedAt,
@@ -44,17 +40,13 @@ class OrderDetail {
       detailsId: map['details_id'] as String? ?? '',
       orderId: map['order_id'] as String? ?? '',
       tailorId: map['tailor_id'] as String? ?? '',
-      customerId: map['customerId'] as String? ?? '',
       customerName: map['customer_name'] as String? ?? '',
-      description: map['description'] as String? ?? '',
+      description: map['description'] as String?,
+      imagePath: map['imagePath'] as String?,
       price: (map['price'] as num?)?.toDouble() ?? 0.0,
-      totalPrice: (map['totalprice'] as num?)?.toDouble() ?? 0.0,
-      paymentMethod: map['paymentMethod'] as String? ?? 'Cash',
-      paymentStatus: map['paymentStatus'] as String? ?? 'Pending',
+      totalPrice: (map['totalprice'] as num?)?.toDouble(),
+      dueData: map['due_data'] as String?,
       status: map['status'] as int? ?? -1,
-      dueDate: map['due_data'] != null
-          ? DateTime.tryParse(map['due_data'] as String)
-          : null,
       fabric: map['fabric'] != null
           ? Fabric.fromMap(map['fabric'] as Map<String, dynamic>)
           : null,
@@ -78,20 +70,18 @@ class OrderDetail {
       'details_id': detailsId,
       'order_id': orderId,
       'tailor_id': tailorId,
-      'customerId': customerId,
       'customer_name': customerName,
-      'description': description,
+      if (description != null) 'description': description,
+      if (imagePath != null) 'imagePath': imagePath,
       'price': price,
-      'totalprice': totalPrice,
-      'paymentMethod': paymentMethod,
-      'paymentStatus': paymentStatus,
+      if (totalPrice != null) 'totalprice': totalPrice,
+      if (dueData != null) 'due_data': dueData,
       'status': status,
-      'due_data': dueDate?.toIso8601String(),
-      'fabric': fabric?.toMap(),
-      'measurements': measurements?.toMap(),
-      'orderDetails': orderDetails?.map((item) => item.toMap()).toList(),
-      'createdAt': createdAt,
-      'updatedAt': updatedAt,
+      if (fabric != null) 'fabric': fabric!.toMap(),
+      if (measurements != null) 'measurements': measurements!.toMap(),
+      if (orderDetails != null) 'orderDetails': orderDetails!.map((item) => item.toMap()).toList(),
+      if (createdAt != null) 'createdAt': createdAt,
+      if (updatedAt != null) 'updatedAt': updatedAt,
     };
   }
 
@@ -99,17 +89,15 @@ class OrderDetail {
     String? detailsId,
     String? orderId,
     String? tailorId,
-    String? customerId,
     String? customerName,
     String? description,
-    double? price,
-    double? totalPrice,
-    String? paymentMethod,
-    String? paymentStatus,
-    int? status,
-    DateTime? dueDate,
+    String? imagePath,
     Fabric? fabric,
     Measurements? measurements,
+    double? price,
+    double? totalPrice,
+    String? dueData,
+    int? status,
     List<OrderItem>? orderDetails,
     Timestamp? createdAt,
     Timestamp? updatedAt,
@@ -118,17 +106,15 @@ class OrderDetail {
       detailsId: detailsId ?? this.detailsId,
       orderId: orderId ?? this.orderId,
       tailorId: tailorId ?? this.tailorId,
-      customerId: customerId ?? this.customerId,
       customerName: customerName ?? this.customerName,
       description: description ?? this.description,
-      price: price ?? this.price,
-      totalPrice: totalPrice ?? this.totalPrice,
-      paymentMethod: paymentMethod ?? this.paymentMethod,
-      paymentStatus: paymentStatus ?? this.paymentStatus,
-      status: status ?? this.status,
-      dueDate: dueDate ?? this.dueDate,
+      imagePath: imagePath ?? this.imagePath,
       fabric: fabric ?? this.fabric,
       measurements: measurements ?? this.measurements,
+      price: price ?? this.price,
+      totalPrice: totalPrice ?? this.totalPrice,
+      dueData: dueData ?? this.dueData,
+      status: status ?? this.status,
       orderDetails: orderDetails ?? this.orderDetails,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -141,110 +127,104 @@ class OrderDetail {
 }
 
 class Fabric {
-  final String shirtFabric;
-  final String trouserFabric;
-  final String dupatFabric;
+  final String? shirtFabric;
+  final String? trouserFabric;
+  final String? dupataFabric;
 
   Fabric({
-    required this.shirtFabric,
-    required this.trouserFabric,
-    required this.dupatFabric,
+    this.shirtFabric,
+    this.trouserFabric,
+    this.dupataFabric,
   });
 
   factory Fabric.fromMap(Map<String, dynamic> map) {
     return Fabric(
-      shirtFabric: map['shirt_fabric'] as String? ?? '',
-      trouserFabric: map['trouser_fabric'] as String? ?? '',
-      dupatFabric: map['dupata_fabric'] as String? ?? '',
+      shirtFabric: map['shirt_fabric'] as String?,
+      trouserFabric: map['trouser_fabric'] as String?,
+      dupataFabric: map['dupata_fabric'] as String?,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'shirt_fabric': shirtFabric,
-      'trouser_fabric': trouserFabric,
-      'dupata_fabric': dupatFabric,
+      if (shirtFabric != null) 'shirt_fabric': shirtFabric,
+      if (trouserFabric != null) 'trouser_fabric': trouserFabric,
+      if (dupataFabric != null) 'dupata_fabric': dupataFabric,
     };
   }
 
   Fabric copyWith({
     String? shirtFabric,
     String? trouserFabric,
-    String? dupatFabric,
+    String? dupataFabric,
   }) {
     return Fabric(
       shirtFabric: shirtFabric ?? this.shirtFabric,
       trouserFabric: trouserFabric ?? this.trouserFabric,
-      dupatFabric: dupatFabric ?? this.dupatFabric,
+      dupataFabric: dupataFabric ?? this.dupataFabric,
     );
   }
 }
 
 class Measurements {
-  final double chest;
-  final double waist;
-  final double hips;
-  final double shoulder;
-  final double armLength;
-  final double wrist;
-  final double armpit;
-  final String fittingPreferences;
+  final double? armLength;
+  final double? chest;
+  final double? shoulder;
+  final double? waist;
+  final double? hips;
+  final double? wrist;
+  final String? fittingPreferences;
 
   Measurements({
-    required this.chest,
-    required this.waist,
-    required this.hips,
-    required this.shoulder,
-    required this.armLength,
-    required this.wrist,
-    required this.armpit,
-    required this.fittingPreferences,
+    this.armLength,
+    this.chest,
+    this.shoulder,
+    this.waist,
+    this.hips,
+    this.wrist,
+    this.fittingPreferences,
   });
 
   factory Measurements.fromMap(Map<String, dynamic> map) {
     return Measurements(
-      chest: (map['chest'] as num?)?.toDouble() ?? 0.0,
-      waist: (map['waist'] as num?)?.toDouble() ?? 0.0,
-      hips: (map['hips'] as num?)?.toDouble() ?? 0.0,
-      shoulder: (map['shoulder'] as num?)?.toDouble() ?? 0.0,
-      armLength: (map['arm_length'] as num?)?.toDouble() ?? 0.0,
-      wrist: (map['wrist'] as num?)?.toDouble() ?? 0.0,
-      armpit: (map['armpit'] as num?)?.toDouble() ?? 0.0,
-      fittingPreferences: map['fitting_preferences'] as String? ?? 'Regular Fit',
+      armLength: (map['arm_length'] as num?)?.toDouble(),
+      chest: (map['chest'] as num?)?.toDouble(),
+      shoulder: (map['shoulder'] as num?)?.toDouble(),
+      waist: (map['waist'] as num?)?.toDouble(),
+      hips: (map['hips'] as num?)?.toDouble(),
+      wrist: (map['wrist'] as num?)?.toDouble(),
+      fittingPreferences: map['fitting_preferences'] as String?,
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'chest': chest,
-      'waist': waist,
-      'hips': hips,
-      'shoulder': shoulder,
-      'arm_length': armLength,
-      'wrist': wrist,
-      'armpit': armpit,
-      'fitting_preferences': fittingPreferences,
+      if (armLength != null) 'arm_length': armLength,
+      if (chest != null) 'chest': chest,
+      if (shoulder != null) 'shoulder': shoulder,
+      if (waist != null) 'waist': waist,
+      if (hips != null) 'hips': hips,
+      if (wrist != null) 'wrist': wrist,
+      if (fittingPreferences != null) 'fitting_preferences': fittingPreferences,
     };
   }
 
   Measurements copyWith({
+    double? armLength,
     double? chest,
+    double? shoulder,
     double? waist,
     double? hips,
-    double? shoulder,
-    double? armLength,
     double? wrist,
-    double? armpit,
     String? fittingPreferences,
   }) {
     return Measurements(
+      armLength: armLength ?? this.armLength,
       chest: chest ?? this.chest,
+      shoulder: shoulder ?? this.shoulder,
       waist: waist ?? this.waist,
       hips: hips ?? this.hips,
-      shoulder: shoulder ?? this.shoulder,
-      armLength: armLength ?? this.armLength,
       wrist: wrist ?? this.wrist,
-      armpit: armpit ?? this.armpit,
       fittingPreferences: fittingPreferences ?? this.fittingPreferences,
     );
   }
