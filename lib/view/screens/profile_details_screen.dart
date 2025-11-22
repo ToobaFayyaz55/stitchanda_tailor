@@ -12,9 +12,12 @@ class ProfileDetailsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Profile Details', style: TextStyle(color: AppColors.textBlack)),
-        backgroundColor: AppColors.caramel,
-        iconTheme: const IconThemeData(color: AppColors.textBlack),
+        title: const Text(
+            "Profile Details",
+            style: TextStyle(
+                fontSize: 20
+            )
+        ),
       ),
       body: BlocBuilder<AuthCubit, AuthState>(
         builder: (context, state) {
@@ -130,24 +133,38 @@ class ProfileDetailsScreen extends StatelessWidget {
                                 color: AppColors.textBlack,
                               ),
                             ),
-                            Icon(
-                              Icons.edit_outlined,
-                              size: 20,
-                              color: AppColors.caramel,
+                            GestureDetector(
+                              onTap: () => _showSpecializationsEditDialog(context, tailor.category),
+                              child: Icon(
+                                Icons.edit_outlined,
+                                size: 20,
+                                color: AppColors.caramel,
+                              ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 12),
                         if (tailor.category.isEmpty)
-                          Text(
-                            'No specializations added yet',
-                            style: Theme.of(context).textTheme.bodyMedium,
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.beige.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'No specializations added yet',
+                              style: TextStyle(
+                                color: AppColors.textGrey,
+                                fontSize: 14,
+                              ),
+                            ),
                           )
                         else
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
                             children: tailor.category
+                                .where((category) => category.toLowerCase() != 'both')
                                 .map((category) => _SkillChip(skill: category))
                                 .toList(),
                           ),
@@ -166,19 +183,6 @@ class ProfileDetailsScreen extends StatelessWidget {
                         const SizedBox(height: 12),
                         _ReviewSection(review: tailor.review),
 
-                        const SizedBox(height: 24),
-
-                        // Gallery section
-                        const Text(
-                          'Gallery',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textBlack,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _GallerySection(),
 
                         const SizedBox(height: 40),
                       ],
@@ -246,7 +250,7 @@ class _DetailHeaderState extends State<_DetailHeader> {
                 onTap: _uploading ? null : _pickAndUpload,
                 child: CircleAvatar(
                   key: ValueKey(tailor.image_path),
-                  radius: 40,
+                  radius: 60, // Increased from 40 to 60
                   backgroundColor: AppColors.beige,
                   backgroundImage: (tailor.image_path is String && tailor.image_path.isNotEmpty)
                       ? NetworkImage('${tailor.image_path}?v=${DateTime.now().millisecondsSinceEpoch}')
@@ -254,55 +258,59 @@ class _DetailHeaderState extends State<_DetailHeader> {
                   child: (tailor.image_path == null || tailor.image_path.isEmpty)
                       ? const Icon(
                           Icons.person,
-                          size: 50,
+                          size: 70,
                           color: AppColors.deepBrown,
                         )
                       : null,
                 ),
               ),
               Positioned(
-                bottom: 4,
-                right: 4,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: AppColors.caramel,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.surface, width: 2),
-                  ),
-                  child: _uploading
-                      ? const SizedBox(
-                          height: 14,
-                          width: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                bottom: 0,
+                right: 0,
+                child: GestureDetector(
+                  onTap: _uploading ? null : _pickAndUpload,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.caramel,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                    ),
+                    child: _uploading
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(
+                            Icons.edit,
+                            color: Colors.white,
+                            size: 18,
                           ),
-                        )
-                      : const Icon(
-                          Icons.edit_outlined,
-                          color: Colors.white,
-                          size: 14,
-                        ),
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             tailor.name,
-            style: Theme.of(context)
-                .textTheme
-                .bodyLarge!
-                .copyWith(fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textBlack,
+            ),
           ),
-          Text(
-            tailor.verification_status == 1
-                ? 'Verified'
-                : tailor.verification_status == 0
-                    ? 'Pending Approval'
-                    : 'Rejected',
-            style: Theme.of(context).textTheme.bodyMedium,
+          const SizedBox(height: 4),
+          const Text(
+            'Tailor',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textGrey,
+            ),
           ),
         ],
       ),
@@ -416,7 +424,7 @@ class _SkillChip extends StatelessWidget {
 
 // Review Section - Display tailor rating
 class _ReviewSection extends StatelessWidget {
-  final int review;
+  final double review;
 
   const _ReviewSection({required this.review});
 
@@ -437,7 +445,7 @@ class _ReviewSection extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            '$review.0 / 5.0',
+            '${review.toStringAsFixed(1)} / 5.0',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: AppColors.caramel,
@@ -450,72 +458,13 @@ class _ReviewSection extends StatelessWidget {
               5,
               (index) => Icon(
                 Icons.star,
-                color: index < review ? Colors.amber : AppColors.outline,
+                color: index < review.floor() ? Colors.amber : AppColors.outline,
                 size: 16,
               ),
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-// Gallery Section - Display tailor's work images
-class _GallerySection extends StatelessWidget {
-  const _GallerySection();
-
-  @override
-  Widget build(BuildContext context) {
-    // Placeholder images - in real app, fetch from Firebase Storage
-    final List<String> galleryPlaceholders = [
-      'assets/images/logo.png',
-      'assets/images/logo2.png',
-      'assets/images/logo.png',
-      'assets/images/logo2.png',
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1,
-      ),
-      itemCount: galleryPlaceholders.length,
-      itemBuilder: (context, index) {
-        return Container(
-          decoration: BoxDecoration(
-            color: AppColors.beige,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.outline),
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Placeholder for image
-              Image.asset(
-                galleryPlaceholders[index],
-                fit: BoxFit.cover,
-              ),
-              // Add button overlay
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.add,
-                  color: Colors.white,
-                  size: 32,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }
@@ -546,6 +495,9 @@ void _showEditDialog(
           child: const Text('Cancel'),
         ),
         ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.caramel,
+          ),
           onPressed: () {
             onSave(controller.text);
             Navigator.pop(dialogContext);
@@ -556,3 +508,79 @@ void _showEditDialog(
     ),
   );
 }
+
+// Helper function to show specializations edit dialog
+void _showSpecializationsEditDialog(
+  BuildContext context,
+  List<String> currentSpecializations,
+) {
+  final List<String> allSpecializations = [
+    'male',
+    'female',
+    'kids',
+    'bridal',
+    'formal',
+    'casual',
+    'traditional',
+    'western',
+  ];
+
+  final selectedSpecializations = List<String>.from(currentSpecializations);
+
+  showDialog(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: const Text('Edit Specializations'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: allSpecializations.map((spec) {
+              final isSelected = selectedSpecializations.contains(spec);
+              // Capitalize first letter for display
+              final displayName = spec[0].toUpperCase() + spec.substring(1);
+
+              return CheckboxListTile(
+                title: Text(displayName),
+                value: isSelected,
+                activeColor: AppColors.caramel,
+                onChanged: (bool? value) {
+                  setState(() {
+                    if (value == true) {
+                      if (!selectedSpecializations.contains(spec)) {
+                        selectedSpecializations.add(spec);
+                      }
+                    } else {
+                      selectedSpecializations.remove(spec);
+                    }
+                  });
+                },
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.caramel,
+            ),
+            onPressed: () {
+              context.read<AuthCubit>().updateTailorProfile({'category': selectedSpecializations});
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Specializations updated successfully')),
+              );
+              Navigator.pop(dialogContext);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+

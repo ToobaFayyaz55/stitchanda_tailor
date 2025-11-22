@@ -13,14 +13,17 @@ class OrdersScreen extends StatefulWidget {
 }
 
 class _OrdersScreenState extends State<OrdersScreen> {
-  String _selectedFilter = 'pending'; // allorders | pending | inprogress | completed
+  String _selectedFilter = 'allorders'; // allorders | pending | inprogress | completed
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _fetchOrders();
+    // Delay fetch until after first frame to ensure context is ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchOrders();
+    });
   }
 
   @override
@@ -307,7 +310,15 @@ class _OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final orderId = (order['order_id'] as String?) ?? '';
     final totalPrice = (order['total_price'] as num?)?.toDouble() ?? 0.0;
-    final status = (order['status'] as int?) ?? -999;
+
+    // Handle status - it might come as int or String from Firebase
+    int status = -999;
+    final statusValue = order['status'];
+    if (statusValue is int) {
+      status = statusValue;
+    } else if (statusValue is String) {
+      status = int.tryParse(statusValue) ?? -999;
+    }
 
     // Due date is now enriched from order_details collection (earliest due_data)
     final dueDate = order['due_date'];

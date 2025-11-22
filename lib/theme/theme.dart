@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 class AppColors {
   static const Color caramel = Color(0xFFD49649); // main accent button color
   static const Color gold = Color(0xFFDEA666); // lighter gold tone
+  static const Color coffee = Color(0xFFBB7A49); // lighter gold tone
   static const Color beige = Color(0xFFE6BA88); // secondary soft tone
   static const Color deepBrown = Color(0xFF8E7051); // text & icon color
   static const Color chocolate = Color(0xFF5B4632); // darker brown for accents

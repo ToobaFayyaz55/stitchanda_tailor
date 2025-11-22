@@ -38,7 +38,7 @@ class Tailor {
   final String gender; // 'male' | 'female' | 'other'
   final List<String> category; // ('male' | 'female' | 'both')[]
   final int experience;
-  final int review; // assuming integer review score as in previous implementation
+  final double review; // review rating (can be decimal like 4.5)
   final bool availibility_status;
   final bool is_verified;
   final int verification_status; // 0 | 1 | 2
@@ -91,7 +91,7 @@ class Tailor {
           ? List<String>.from((map['category'] as List).map((e) => e.toString()))
           : <String>[],
       experience: (map['experience'] is int) ? map['experience'] as int : int.tryParse(map['experience']?.toString() ?? '') ?? 0,
-      review: (map['review'] is int) ? map['review'] as int : int.tryParse(map['review']?.toString() ?? '') ?? 0,
+      review: (map['review'] is num) ? (map['review'] as num).toDouble() : double.tryParse(map['review']?.toString() ?? '') ?? 0.0,
       availibility_status: map['availibility_status'] as bool? ?? true,
       is_verified: map['is_verified'] as bool? ?? false,
       verification_status: map['verification_status'] as int? ?? map['verification_status'] as int? ?? 0,
@@ -136,7 +136,7 @@ class Tailor {
     String? gender,
     List<String>? category,
     int? experience,
-    int? review,
+    double? review,
     bool? availibility_status,
     bool? is_verified,
     int? verification_status,

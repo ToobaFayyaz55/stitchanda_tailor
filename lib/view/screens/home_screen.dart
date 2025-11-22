@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stichanda_tailor/controller/order_cubit.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
-import 'package:stichanda_tailor/data/models/order_detail_model.dart';
-import 'package:stichanda_tailor/data/models/verification_status.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import '../base/custom_bottom_nav_bar.dart';
 import 'orders_screen.dart';
@@ -20,170 +18,191 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     // Fetch orders when screen loads
-    final authState = context.read<AuthCubit>().state;
-    if (authState is AuthSuccess) {
-      context.read<OrderCubit>().fetchPendingOrderDetailsForTailor(
-            authState.tailor.tailor_id,
-          );
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authState = context.read<AuthCubit>().state;
+      if (authState is AuthSuccess) {
+        context.read<OrderCubit>().fetchOrdersForTailorWithCustomerNames(
+              authState.tailor.tailor_id,
+            );
+      }
+    });
   }
 
-  // Helper method to parse dueData string to DateTime
-  DateTime _parseDueData(String? dueData) {
-    if (dueData == null || dueData.isEmpty) {
-      return DateTime.fromMillisecondsSinceEpoch(8640000000000000); // far future date for nulls
+  int _calculateDaysLeft(dynamic dueDate) {
+    if (dueDate == null) return 0;
+    DateTime? dt;
+    if (dueDate is int) {
+      dt = DateTime.fromMillisecondsSinceEpoch(dueDate);
+    } else if (dueDate is String) {
+      dt = DateTime.tryParse(dueDate);
+    } else if (dueDate.runtimeType.toString().contains('Timestamp')) {
+      dt = (dueDate as dynamic).toDate();
     }
-    try {
-      return DateTime.parse(dueData);
-    } catch (e) {
-      return DateTime.fromMillisecondsSinceEpoch(8640000000000000);
-    }
+    if (dt == null) return 0;
+
+    final now = DateTime.now();
+    final difference = dt.difference(DateTime(now.year, now.month, now.day));
+    return difference.inDays;
+  }
+
+  Color _getDaysLeftColor(int daysLeft) {
+    if (daysLeft <= 2) return Colors.red;
+    if (daysLeft <= 10) return Colors.orange;
+    return Colors.green;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home Screen', style: TextStyle(color: AppColors.textBlack)),
-        backgroundColor: AppColors.caramel,
-        automaticallyImplyLeading: false,
-        // removed logout action; logout should be in profile screen only
-      ),
+      backgroundColor: AppColors.background,
       body: SafeArea(
-        child: BlocListener<AuthCubit, AuthState>(
-          listener: (context, authState) {
-            if (authState is AuthError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(authState.message), backgroundColor: Colors.red),
-              );
+        child: BlocBuilder<OrderCubit, OrderState>(
+          builder: (context, orderState) {
+            final authState = context.watch<AuthCubit>().state;
+
+            if (authState is! AuthSuccess) {
+              return const Center(child: Text('Please login'));
             }
-          },
-          child: BlocConsumer<OrderCubit, OrderState>(
-            listener: (context, state) {
-              if (state is OrderError) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(state.message),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            builder: (context, state) {
-              final authState = context.watch<AuthCubit>().state;
 
-              // prepare metrics based on order data
-              List<OrderDetail> allOrders = [];
-              if (state is OrderDetailsSuccess) {
-                allOrders = state.orderDetails;
-              }
+            final tailor = authState.tailor;
 
-              final activeOrders = allOrders.where((o) => o.status == -1).length;
-              final completedOrders = allOrders.where((o) => o.status == 2).length;
-              final avgRating = (authState is AuthSuccess) ? authState.tailor.review.toDouble() : 0.0;
-              final earnings = allOrders.fold<double>(0.0, (sum, o) => sum + (o.totalPrice ?? 0.0));
+            // Get orders data
+            List<Map<String, dynamic>> allOrders = [];
+            if (orderState is OrdersListSuccess) {
+              allOrders = orderState.orders;
+            }
 
-              if (state is OrderLoading) {
-                return const Center(child: CircularProgressIndicator());
-              }
+            // Calculate stats
+            final activeOrders = allOrders.where((o) {
+              final status = o['status'] is int ? o['status'] : int.tryParse(o['status'].toString()) ?? -999;
+              return status >= 0 && status < 5; // In progress statuses (0-4)
+            }).length;
 
-              return SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header with avatar + availability (arranged to match screenshot)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            final completedOrders = allOrders.where((o) {
+              final status = o['status'] is int ? o['status'] : int.tryParse(o['status'].toString()) ?? -999;
+              return status >= 5 && status <= 10; // Completed statuses (5-10)
+            }).length;
+
+            // Convert review to double (handles both int and double from Firebase)
+            final avgRating = tailor.review.toDouble();
+
+            final earnings = allOrders.fold<double>(0.0, (sum, o) {
+              final price = (o['total_price'] as num?)?.toDouble() ?? 0.0;
+              return sum + price;
+            });
+
+            // Filter pending orders (status -2)
+            final pendingOrders = allOrders.where((o) {
+              final status = o['status'] is int ? o['status'] : int.tryParse(o['status'].toString()) ?? -999;
+              return status == 4;
+            }).toList();
+
+            // Sort by due date
+            pendingOrders.sort((a, b) {
+              final aDue = _calculateDaysLeft(a['due_date']);
+              final bDue = _calculateDaysLeft(b['due_date']);
+              return aDue.compareTo(bDue);
+            });
+
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header with avatar and availability
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    color: Colors.white,
+                    child: Row(
                       children: [
+                        // Avatar
                         Container(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.outline, width: 2),
+                            border: Border.all(color: AppColors.beige, width: 2),
                           ),
-                          child: const CircleAvatar(
+                          child: CircleAvatar(
                             radius: 28,
-                            backgroundImage: AssetImage('assets/images/logo2.png'),
+                            backgroundColor: AppColors.beige,
+                            backgroundImage: tailor.image_path.isNotEmpty
+                                ? NetworkImage(tailor.image_path)
+                                : null,
+                            child: tailor.image_path.isEmpty
+                                ? const Icon(Icons.person, size: 30, color: AppColors.deepBrown)
+                                : null,
                           ),
                         ),
                         const SizedBox(width: 12),
+
+                        // Name and role
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                (authState is AuthSuccess) ? authState.tailor.name : 'Tailor',
+                                tailor.name,
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
+                                  color: AppColors.textBlack,
                                 ),
                               ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  const Icon(Icons.verified, color: Colors.green, size: 14),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    (authState is AuthSuccess)
-                                        ? VerificationStatus.getStatusName(authState.tailor.verification_status)
-                                        : 'unverified',
-                                    style: const TextStyle(fontSize: 12, color: AppColors.textGrey),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  const Icon(Icons.star, color: Colors.amber, size: 14),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    avgRating.toStringAsFixed(1),
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                                  ),
-                                ],
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Tailor',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.textGrey,
+                                ),
                               ),
                             ],
                           ),
                         ),
 
-                        // Availability toggle (aligned top-right)
+                        // Availability toggle
                         Column(
-                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
-                            const Text('Available', style: TextStyle(fontSize: 12)),
-                            const SizedBox(height: 6),
-                            // Show spinner while availability is being updated
-                            if (authState is AuthLoading)
-                              const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2))
-                            else
-                              Switch(
-                                value: (authState is AuthSuccess) ? authState.tailor.availibility_status : true,
-                                onChanged: (v) {
-                                  context.read<AuthCubit>().updateAvailability(v);
-                                },
-                                thumbColor: WidgetStateProperty.resolveWith((states) => AppColors.caramel),
-                                trackColor: WidgetStateProperty.resolveWith((states) => const Color.fromRGBO(216, 150, 75, 0.3)),
+                            const Text(
+                              'Available',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textGrey,
                               ),
+                            ),
+                            const SizedBox(height: 4),
+                            Switch(
+                              value: tailor.availibility_status,
+                              onChanged: (value) {
+                                context.read<AuthCubit>().updateAvailability(value);
+                              },
+                              activeTrackColor: AppColors.caramel.withValues(alpha: 0.5),
+                              activeThumbColor: AppColors.caramel,
+                            ),
                           ],
                         ),
                       ],
                     ),
+                  ),
 
-                    const SizedBox(height: 18),
+                  const SizedBox(height: 16),
 
-                    // 4 Stats cards implemented as two rows to avoid overflow on small screens
-                    Column(
+                  // Stats cards (2x2 grid)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
                       children: [
                         Row(
                           children: [
                             Expanded(
-                              child: SizedBox(
-                                // increased height to prevent bottom overflow on tight layouts
-                                height: 86,
-                                child: _StatCard(title: 'Active Orders', value: activeOrders.toString(), accent: AppColors.beige),
+                              child: _StatCard(
+                                title: 'Active Orders',
+                                value: activeOrders.toString(),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: SizedBox(
-                                height: 86,
-                                child: _StatCard(title: 'Completed', value: completedOrders.toString(), accent: AppColors.beige),
+                              child: _StatCard(
+                                title: 'Completed',
+                                value: completedOrders.toString(),
                               ),
                             ),
                           ],
@@ -192,95 +211,109 @@ class _HomeScreenState extends State<HomeScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: SizedBox(
-                                height: 86,
-                                child: _StatCard(title: 'Avg. Rating', value: avgRating.toStringAsFixed(1), accent: AppColors.beige),
+                              child: _StatCard(
+                                title: 'Avg. Rating',
+                                value: avgRating.toStringAsFixed(1),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: SizedBox(
-                                height: 86,
-                                child: _StatCard(title: 'Earnings', value: '${earnings.toStringAsFixed(0)} Pkr', accent: AppColors.beige),
+                              child: _StatCard(
+                                title: 'Earnings',
+                                value: '${(earnings / 1000).toStringAsFixed(0)}k Pkr',
                               ),
                             ),
                           ],
                         ),
                       ],
                     ),
+                  ),
 
-                    const SizedBox(height: 14),
+                  const SizedBox(height: 24),
 
-                    // In-progress Orders (show top 3 nearest to deadline)
-                    Row(
+                  // Pending Orders section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'In Progress',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          'Pending Orders',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textBlack,
+                          ),
                         ),
                         TextButton(
                           onPressed: () {
-                            // Push OrdersScreen (orders tab) so user can navigate back
                             Navigator.push(
                               context,
                               MaterialPageRoute(builder: (context) => const OrdersScreen()),
                             );
                           },
-                          child: const Text('View All', style: TextStyle(color: AppColors.caramel)),
+                          child: const Text(
+                            'View All',
+                            style: TextStyle(
+                              color: AppColors.caramel,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ],
                     ),
+                  ),
 
-                    const SizedBox(height: 8),
+                  const SizedBox(height: 12),
 
-                    // compute in-progress and nearest-deadline orders
-                    Builder(builder: (context) {
-                      // Filter in-progress statuses (0,1)
-                      final inProgress = allOrders.where((o) => o.status == 0 || o.status == 1).toList();
-
-                      // Sort by dueData ascending (nulls last)
-                      inProgress.sort((a, b) {
-                        // Parse dueData string to DateTime for comparison
-                        final aDue = _parseDueData(a.dueData);
-                        final bDue = _parseDueData(b.dueData);
-                        return aDue.compareTo(bDue);
-                      });
-
-                      // Take top 3 nearest deadlines
-                      final visibleOrders = inProgress.take(3).toList();
-
-                      if (visibleOrders.isEmpty) {
-                        return Center(
-                          child: Column(
-                            children: const [
-                              SizedBox(height: 20),
-                              Icon(Icons.shopping_bag_outlined, size: 80, color: AppColors.textGrey),
-                              SizedBox(height: 12),
-                              Text('No In-Progress Orders', style: TextStyle(color: AppColors.textGrey)),
-                            ],
-                          ),
+                  // Pending orders list
+                  if (orderState is OrderLoading)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else if (pendingOrders.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          children: const [
+                            Icon(Icons.assignment_outlined, size: 64, color: AppColors.textGrey),
+                            SizedBox(height: 12),
+                            Text(
+                              'No Pending Orders',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: AppColors.textGrey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: pendingOrders.length > 3 ? 3 : pendingOrders.length,
+                      itemBuilder: (context, index) {
+                        final order = pendingOrders[index];
+                        return _PendingOrderCard(
+                          order: order,
+                          daysLeft: _calculateDaysLeft(order['due_date']),
+                          daysLeftColor: _getDaysLeftColor(_calculateDaysLeft(order['due_date'])),
                         );
-                      }
+                      },
+                    ),
 
-                      return ListView.builder(
-                        physics: const NeverScrollableScrollPhysics(),
-                        shrinkWrap: true,
-                        itemCount: visibleOrders.length,
-                        itemBuilder: (context, index) {
-                          final od = visibleOrders[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12.0),
-                            child: OrderDetailCard(orderDetail: od),
-                          );
-                        },
-                      );
-                    }),
-                  ],
-                ),
-              );
-            },
-          ),
+                  const SizedBox(height: 80), // Space for bottom nav
+                ],
+              ),
+            );
+          },
         ),
       ),
       bottomNavigationBar: const CustomBottomNavBar(activeIndex: 2),
@@ -288,61 +321,49 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// Small stat card widget
+// Stat card widget
 class _StatCard extends StatelessWidget {
   final String title;
   final String value;
-  final Color? accent; // used as background color for the card
 
-  const _StatCard({Key? key, required this.title, required this.value, this.accent}) : super(key: key);
+  const _StatCard({
+    required this.title,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = accent ?? AppColors.beige; // card background (beige)
-    final actionColor = AppColors.caramel; // icon box color (caramel)
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color.fromRGBO(216, 150, 75, 0.12)),
+        color: AppColors.beige,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: const Color.fromRGBO(0, 0, 0, 0.02), blurRadius: 8, offset: const Offset(0, 3)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title + Value
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 13, color: AppColors.textBlack)),
-                const SizedBox(height: 6),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textBlack,
-                  ),
-                ),
-              ],
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textGrey,
+              fontWeight: FontWeight.w500,
             ),
           ),
-
-          // Icon box
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: actionColor,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Center(
-              child: Icon(Icons.bar_chart, color: Colors.white, size: 16),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textBlack,
             ),
           ),
         ],
@@ -351,179 +372,264 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// ==================== ORDER DETAIL CARD WIDGET ====================
+// Pending order card widget
+class _PendingOrderCard extends StatelessWidget {
+  final Map<String, dynamic> order;
+  final int daysLeft;
+  final Color daysLeftColor;
 
-class OrderDetailCard extends StatelessWidget {
-  final OrderDetail orderDetail;
+  const _PendingOrderCard({
+    required this.order,
+    required this.daysLeft,
+    required this.daysLeftColor,
+  });
 
-  const OrderDetailCard({
-    Key? key,
-    required this.orderDetail,
-  }) : super(key: key);
+  @override
+  Widget build(BuildContext context) {
+    final orderId = (order['order_id'] as String?) ?? '';
+    final customerName = (order['customer_name'] as String?) ?? 'Customer';
+    final totalPrice = (order['total_price'] as num?)?.toDouble() ?? 0.0;
 
-  String _getStatusLabel(int status) {
-    switch (status) {
-      case -1:
-        return 'Pending';
-      case 0:
-        return 'Accepted';
-      case 1:
-        return 'In Progress';
-      case 2:
-        return 'Completed';
-      default:
-        return 'Unknown';
+    // Handle status
+    int status = -999;
+    final statusValue = order['status'];
+    if (statusValue is int) {
+      status = statusValue;
+    } else if (statusValue is String) {
+      status = int.tryParse(statusValue) ?? -999;
     }
-  }
 
-  Color _getStatusColor(int status) {
-    switch (status) {
-      case -1:
-        return Colors.orange;
-      case 0:
-        return Colors.blue;
-      case 1:
-        return Colors.purple;
-      case 2:
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
-  }
+    final dueDate = order['due_date'];
+    final shouldShowDeadline = status != OrderCubit.statusRejected &&
+                               !OrderCubit.completedStatuses.contains(status);
 
-  void _openChat(BuildContext context) async {
-    // Customer ID is not available in OrderDetail model
-    // This would need to fetch the parent order to get customer_id
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Chat feature requires order update')),
+    return Card(
+      elevation: 3,
+      margin: const EdgeInsets.only(bottom: 12),
+      shadowColor: Colors.black.withValues(alpha: 0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: () {
+          // Navigate to order details if needed
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white,
+                AppColors.surface.withValues(alpha: 0.3),
+              ],
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Order ID and Status Tag
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '#$orderId',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textGrey,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.caramel.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.person_outline,
+                                  size: 16,
+                                  color: AppColors.caramel,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  customerName,
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textBlack,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    _StatusBadge(status: status),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+
+                // Deadline Container and Price
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Deadline Indicator (only for active orders)
+                    if (shouldShowDeadline)
+                      Flexible(
+                        child: _DeadlineIndicator(
+                          daysLeft: daysLeft,
+                          hasDate: dueDate != null,
+                        ),
+                      )
+                    else
+                      const SizedBox.shrink(),
+
+                    if (shouldShowDeadline) const SizedBox(width: 12),
+
+                    // Price
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.caramel.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppColors.caramel.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.currency_rupee,
+                            size: 16,
+                            color: AppColors.caramel,
+                          ),
+                          Text(
+                            totalPrice.toStringAsFixed(0),
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.caramel,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
-    return;
+  }
+}
+
+// Status Badge widget
+class _StatusBadge extends StatelessWidget {
+  final int status;
+
+  const _StatusBadge({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: OrderCubit.getStatusColor(status).withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: OrderCubit.getStatusColor(status).withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        OrderCubit.getStatusLabel(status),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: OrderCubit.getStatusColor(status),
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+// Deadline Indicator widget
+class _DeadlineIndicator extends StatelessWidget {
+  final int daysLeft;
+  final bool hasDate;
+
+  const _DeadlineIndicator({
+    required this.daysLeft,
+    required this.hasDate,
+  });
+
+  Color _getDeadlineColor() {
+    if (daysLeft <= 2) return Colors.red;
+    if (daysLeft <= 10) return Colors.orange;
+    return Colors.green;
+  }
+
+  IconData _getDeadlineIcon() {
+    if (daysLeft <= 2) return Icons.warning_amber_rounded;
+    return Icons.access_time;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        orderDetail.customerName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        orderDetail.orderId,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textGrey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Row(
-                  children: [
-                    IconButton(
-                      tooltip: 'Chat with customer',
-                      onPressed: () => _openChat(context),
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      color: AppColors.caramel,
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(orderDetail.status),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        _getStatusLabel(orderDetail.status),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
+    if (!hasDate) return const SizedBox.shrink();
 
-            // Description
-            Text(
-              orderDetail.description ?? 'No description',
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textBlack,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 12),
+    final color = _getDeadlineColor();
 
-            // Footer with price and due date
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Price: Rs. ${orderDetail.totalPrice ?? orderDetail.price}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.caramel,
-                      ),
-                    ),
-                    if (orderDetail.dueData != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Due: ${orderDetail.dueData}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textGrey,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.caramel,
-                  ),
-                  onPressed: () {
-                    // Navigate to order detail screen
-                  },
-                  child: const Text(
-                    'View',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-          ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+          width: 1,
         ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _getDeadlineIcon(),
+            size: 16,
+            color: color,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$daysLeft days left',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

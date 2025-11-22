@@ -45,9 +45,12 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Conversations', style: TextStyle(color: AppColors.textBlack)),
-        backgroundColor: AppColors.caramel,
-        automaticallyImplyLeading: false,
+        title: const Text(
+            "Conversations",
+            style: TextStyle(
+                fontSize: 20
+            )
+        ),
       ),
       body: !loggedIn
           ? const Center(child: Text('Please login to view conversations'))
