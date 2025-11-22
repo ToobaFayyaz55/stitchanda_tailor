@@ -151,6 +151,39 @@ class OrderCubit extends Cubit<OrderState> {
     }
   }
 
+  /// Confirm material received by tailor (status 3 -> 4)
+  Future<void> confirmMaterialReceived({required String orderId}) async {
+    try {
+      emit(const OrderLoading());
+      await orderRepo.updateOrderStatus(orderId, OrderRepo.STATUS_RECEIVED_TAILOR);
+      emit(const RequestAccepted()); // Reuse existing success state
+    } catch (e) {
+      emit(OrderError(e.toString()));
+    }
+  }
+
+  /// Mark order as completed by tailor (status 4 -> 5)
+  Future<void> markOrderCompleted({required String orderId}) async {
+    try {
+      emit(const OrderLoading());
+      await orderRepo.updateOrderStatus(orderId, OrderRepo.STATUS_COMPLETED_TAILOR);
+      emit(const RequestAccepted()); // Reuse existing success state
+    } catch (e) {
+      emit(OrderError(e.toString()));
+    }
+  }
+
+  /// Call rider for pickup (status 5 -> 6)
+  Future<void> callRider({required String orderId}) async {
+    try {
+      emit(const OrderLoading());
+      await orderRepo.updateOrderStatus(orderId, OrderRepo.STATUS_CALL_RIDER_TAILOR);
+      emit(const RequestAccepted()); // Reuse existing success state
+    } catch (e) {
+      emit(OrderError(e.toString()));
+    }
+  }
+
   // ---------- Existing compatibility: accept/reject by detailsId ----------
   Future<void> tailorAcceptRequest({required String detailsId, required String tailorId}) async {
     try {
@@ -214,7 +247,7 @@ class OrderCubit extends Cubit<OrderState> {
     if (status == OrderRepo.STATUS_UNASSIGNED) return 'Unassigned';
     if (status == OrderRepo.STATUS_RIDER_ASSIGNED_CUSTOMER) return 'Rider Assigned';
     if (status == OrderRepo.STATUS_PICKED_UP_CUSTOMER) return 'Picked Up';
-    if (status == OrderRepo.STATUS_COMPLETED_CUSTOMER) return 'Completed';
+    if (status == OrderRepo.STATUS_COMPLETED_CUSTOMER) return 'Delivered'; // Changed from 'Completed' to 'Delivered'
     if (status == OrderRepo.STATUS_RECEIVED_TAILOR) return 'Received';
     if (status == OrderRepo.STATUS_COMPLETED_TAILOR) return 'Stitching Done';
     if (status == OrderRepo.STATUS_CALL_RIDER_TAILOR) return 'Call Rider';

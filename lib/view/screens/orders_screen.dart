@@ -318,6 +318,19 @@ class _OrderCard extends StatelessWidget {
     // Calculate days left
     final daysLeft = _calculateDaysLeft(dueDate);
 
+    // Only show deadline for pending and in-progress orders, not for rejected or completed
+    final shouldShowDeadline = status != OrderCubit.statusRejected &&
+                               !OrderCubit.completedStatuses.contains(status);
+
+    // Check if order is delivered to tailor (status 3 - needs confirmation)
+    final isDeliveredToTailor = status == OrderCubit.statusCompletedCustomer;
+
+    // Check if tailor is working on order (status 4 - can mark as completed)
+    final isTailorWorking = status == OrderCubit.statusReceivedTailor;
+
+    // Check if stitching is done (status 5 - can call rider)
+    final isStitchingDone = status == OrderCubit.statusCompletedTailor;
+
     return Card(
       elevation: 3,
       shadowColor: Colors.black.withValues(alpha: 0.1),
@@ -405,15 +418,18 @@ class _OrderCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Deadline Indicator (replaces old price position)
-                    Flexible(
-                      child: _DeadlineIndicator(
-                        daysLeft: daysLeft,
-                        hasDate: dueDate != null,
-                      ),
-                    ),
+                    // Deadline Indicator (only for active orders, not rejected/completed)
+                    if (shouldShowDeadline)
+                      Flexible(
+                        child: _DeadlineIndicator(
+                          daysLeft: daysLeft,
+                          hasDate: dueDate != null,
+                        ),
+                      )
+                    else
+                      const SizedBox.shrink(),
 
-                    const SizedBox(width: 12),
+                    if (shouldShowDeadline) const SizedBox(width: 12),
 
                     // Price moved to bottom right
                     Container(
@@ -488,6 +504,72 @@ class _OrderCard extends StatelessWidget {
                     ],
                   ),
                 ],
+
+                // Confirm Receiving Button (for status 3 - delivered to tailor)
+                if (isDeliveredToTailor) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _handleConfirmReceiving(context, orderId),
+                      icon: const Icon(Icons.check_box, size: 20),
+                      label: const Text('Confirm Receiving'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                ],
+
+                // Order Completed Button (for status 4 - tailor working on order)
+                if (isTailorWorking) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _handleOrderCompleted(context, orderId),
+                      icon: const Icon(Icons.done_all, size: 20),
+                      label: const Text('Order Completed'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.caramel,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 2,
+                      ),
+                    ),
+                  ),
+                ],
+
+                // Call Rider Button (for status 5 - stitching done, ready for pickup)
+                if (isStitchingDone) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _handleCallRider(context, orderId),
+                      icon: const Icon(Icons.delivery_dining, size: 20),
+                      label: const Text('Call Rider'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 2,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -511,6 +593,112 @@ class _OrderCard extends StatelessWidget {
     final now = DateTime.now();
     final difference = dt.difference(DateTime(now.year, now.month, now.day));
     return difference.inDays;
+  }
+
+  static void _handleConfirmReceiving(BuildContext context, String orderId) async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Material Receipt'),
+        content: const Text('Have you received the materials for this order?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await context.read<OrderCubit>().confirmMaterialReceived(orderId: orderId);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Material receipt confirmed successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
+  }
+
+  static void _handleOrderCompleted(BuildContext context, String orderId) async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mark Order as Completed'),
+        content: const Text('Have you finished stitching this order?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.caramel),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await context.read<OrderCubit>().markOrderCompleted(orderId: orderId);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Order marked as completed successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
+  }
+
+  static void _handleCallRider(BuildContext context, String orderId) async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Call Rider for Pickup'),
+        content: const Text('Do you want to request a rider to pick up this order?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            child: const Text('Call Rider'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await context.read<OrderCubit>().callRider(orderId: orderId);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Rider request sent successfully!'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 }
 
