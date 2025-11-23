@@ -49,6 +49,10 @@ class _SessionGateState extends State<SessionGate> {
         if (state is AuthError) {
           return const LoginScreen();
         }
+        if (state is PasswordResetEmailSent || state is PasswordResetError) {
+          // Stay on login screen for password reset states
+          return const LoginScreen();
+        }
         if (state is PendingApproval) {
           return PendingApprovalScreen(email: state.email, name: state.name);
         }

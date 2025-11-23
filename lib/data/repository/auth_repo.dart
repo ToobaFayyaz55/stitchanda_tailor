@@ -303,4 +303,55 @@ class AuthRepo {
     if (!doc.exists) throw Exception('Tailor not found');
     return Tailor.fromMap({...doc.data() as Map<String,dynamic>, 'tailor_id': tailorId});
   }
+
+  /// Send password reset email
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _firebaseAuth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found') {
+        throw Exception('No account found with this email.');
+      } else if (e.code == 'invalid-email') {
+        throw Exception('Invalid email format.');
+      } else if (e.code == 'missing-email') {
+        throw Exception('Please enter an email address.');
+      }
+      throw Exception('Password reset failed: ${e.message}');
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Change user password
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null) throw Exception('Not authenticated');
+
+      // Re-authenticate user with current password first
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+
+      await user.reauthenticateWithCredential(credential);
+
+      // Update password
+      await user.updatePassword(newPassword);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'wrong-password') {
+        throw Exception('Current password is incorrect');
+      } else if (e.code == 'weak-password') {
+        throw Exception('New password is too weak');
+      } else if (e.code == 'requires-recent-login') {
+        throw Exception('Please log out and log back in before changing password');
+      }
+      throw Exception('Failed to change password: ${e.message}');
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

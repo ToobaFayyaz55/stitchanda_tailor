@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
+import 'package:stichanda_tailor/view/screens/forgot_password_screen.dart';
 import 'package:stichanda_tailor/view/screens/registration/personal_info_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -37,6 +38,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 SnackBar(
                   content: Text(msg),
                   backgroundColor: Colors.red,
+                ),
+              );
+            } else if (state is PasswordResetEmailSent) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Password reset link sent to ${state.email}'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            } else if (state is PasswordResetError) {
+              String msg = state.message.replaceFirst('Exception: ', '').trim();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(msg),
+                  backgroundColor: AppColors.error,
                 ),
               );
             }
@@ -120,26 +136,37 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
                   // Forgot Password Link
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {
-                        // TODO: Implement forgot password
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ForgotPasswordScreen(),
+                          ),
+                        );
                       },
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                       child: const Text(
                         'Forgot Password?',
                         style: TextStyle(
                           color: AppColors.caramel,
                           fontWeight: FontWeight.w500,
+                          fontSize: 14,
                         ),
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 32),
 
                   // Login Button
                   SizedBox(

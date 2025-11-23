@@ -72,6 +72,20 @@ class AuthBootstrapLoading extends AuthState {
   const AuthBootstrapLoading();
 }
 
+class PasswordResetEmailSent extends AuthState {
+  final String email;
+  const PasswordResetEmailSent(this.email);
+  @override
+  List<Object?> get props => [email];
+}
+
+class PasswordResetError extends AuthState {
+  final String message;
+  const PasswordResetError(this.message);
+  @override
+  List<Object?> get props => [message];
+}
+
 class AuthCubit extends Cubit<AuthState> {
   final AuthRepo authRepo;
   Tailor? _registrationData;
@@ -254,6 +268,52 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
+  // ==================== PASSWORD RESET ====================
+
+  Future<void> sendPasswordReset(String email) async {
+    try {
+      if (email.trim().isEmpty) {
+        emit(PasswordResetError('Please enter your email address.'));
+        return;
+      }
+
+      // Validate email format
+      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email.trim())) {
+        emit(PasswordResetError('Please enter a valid email address.'));
+        return;
+      }
+
+      await authRepo.sendPasswordResetEmail(email.trim());
+      emit(PasswordResetEmailSent(email.trim()));
+
+      // Return to initial state after showing success
+      await Future.delayed(const Duration(seconds: 3));
+      emit(const AuthInitial());
+    } catch (e) {
+      String errorMessage = e.toString();
+
+      // Clean up the error message
+      errorMessage = errorMessage.replaceFirst('Exception: ', '').trim();
+
+      // Provide more user-friendly error messages
+      if (errorMessage.contains('user-not-found')) {
+        errorMessage = 'No account found with this email address.';
+      } else if (errorMessage.contains('invalid-email')) {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (errorMessage.contains('too-many-requests')) {
+        errorMessage = 'Too many requests. Please try again later.';
+      } else if (errorMessage.contains('network')) {
+        errorMessage = 'Network error. Please check your connection.';
+      }
+
+      emit(PasswordResetError(errorMessage));
+
+      // Return to initial after error is shown
+      await Future.delayed(const Duration(seconds: 2));
+      emit(const AuthInitial());
+    }
+  }
+
   // ==================== UTILITY ====================
 
   void clearRegistrationData() {
@@ -346,6 +406,21 @@ class AuthCubit extends Cubit<AuthState> {
     } catch (e) {
       await Future.delayed(_splashDelay);
       emit(AuthError('Session bootstrap failed: $e'));
+    }
+  }
+
+  /// Change user password
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await authRepo.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+    } catch (e) {
+      rethrow;
     }
   }
 }

@@ -82,6 +82,7 @@ flutter:
     - assets/images/logo.png
     - assets/images/logo2.png
     - assets/images/Tailor_reg.png
+    - assets/images/Stitchanda_Tailor_Logo.png
     - .env
 
   fonts:
