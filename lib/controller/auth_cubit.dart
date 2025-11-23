@@ -68,6 +68,9 @@ class RegistrationInProgress extends AuthState {
   List<Object?> get props => [registrationData];
 }
 
+class AuthBootstrapLoading extends AuthState {
+  const AuthBootstrapLoading();
+}
 
 class AuthCubit extends Cubit<AuthState> {
   final AuthRepo authRepo;
@@ -83,18 +86,16 @@ class AuthCubit extends Cubit<AuthState> {
       emit(const AuthLoading());
       final tailor = await authRepo.login(email, password);
 
-      // Check verification status
+      // Map verification_status: 0 pending, 1 verified, -2 rejected
       if (tailor.verification_status == 0) {
-        // Pending approval
         emit(PendingApproval(email: tailor.email, name: tailor.name));
-      } else if (tailor.verification_status == 2) {
-        // Rejected
+      } else if (tailor.verification_status == -2 || tailor.verification_status == 2) {
+        // Support legacy 2 as well as new -2
         emit(VerificationRejected(email: tailor.email, name: tailor.name));
       } else if (tailor.verification_status == 1) {
-        // Verified - can login
         emit(AuthSuccess(tailor));
       } else {
-        emit(AuthError('Unknown verification status'));
+        emit(AuthError('Unknown verification status (${tailor.verification_status}).'));
       }
     } catch (e) {
       emit(AuthError(e.toString()));
@@ -323,20 +324,19 @@ class AuthCubit extends Cubit<AuthState> {
       final user = authRepo.getCurrentUser();
       if (user == null) {
         emit(const AuthInitial());
-        return; // no session; stay on login
+        return;
       }
-      emit(const AuthLoading());
-      // Force fresh fetch from Firestore (status may have changed)
+      // Show splash only here
+      emit(const AuthBootstrapLoading());
       final tailor = await authRepo.fetchTailorById(user.uid);
-      // Map status to state
       if (tailor.verification_status == 0) {
         emit(PendingApproval(email: tailor.email, name: tailor.name));
-      } else if (tailor.verification_status == 2) {
+      } else if (tailor.verification_status == -2 || tailor.verification_status == 2) {
         emit(VerificationRejected(email: tailor.email, name: tailor.name));
       } else if (tailor.verification_status == 1) {
         emit(AuthSuccess(tailor));
       } else {
-        emit(AuthError('Unknown verification status'));
+        emit(AuthError('Unknown verification status (${tailor.verification_status}).'));
       }
     } catch (e) {
       emit(AuthError('Session bootstrap failed: $e'));

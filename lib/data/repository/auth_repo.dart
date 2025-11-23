@@ -258,8 +258,22 @@ class AuthRepo {
           'tailor_id': userId,
         });
       } else {
-        throw Exception('Tailor profile not found');
+        throw Exception('Tailor profile not found for this account.');
       }
+    } on FirebaseAuthException catch (e) {
+      // Friendly messages
+      if (e.code == 'wrong-password') {
+        throw Exception('Incorrect password. Please try again.');
+      } else if (e.code == 'user-not-found') {
+        throw Exception('No tailor account found with this email.');
+      } else if (e.code == 'invalid-email') {
+        throw Exception('The email address is invalid.');
+      } else if (e.code == 'user-disabled') {
+        throw Exception('This account has been disabled. Contact support.');
+      } else if (e.code == 'too-many-requests') {
+        throw Exception('Too many failed attempts. Please wait and try again later.');
+      }
+      throw Exception('Login failed: ${e.message}');
     } catch (e) {
       rethrow;
     }

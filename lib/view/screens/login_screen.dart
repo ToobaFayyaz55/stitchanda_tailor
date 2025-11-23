@@ -3,9 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import 'package:stichanda_tailor/view/screens/registration/personal_info_screen.dart';
-import 'package:stichanda_tailor/view/screens/pending_approval_screen.dart';
-import 'package:stichanda_tailor/view/screens/rejected_screen.dart';
-import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -34,9 +31,11 @@ class _LoginScreenState extends State<LoginScreen> {
         child: BlocConsumer<AuthCubit, AuthState>(
           listener: (context, state) {
             if (state is AuthError) {
+              String msg = state.message;
+              msg = msg.replaceFirst(RegExp(r'^Exception:\s?'), '').trim();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(state.message),
+                  content: Text(msg),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -233,4 +232,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-

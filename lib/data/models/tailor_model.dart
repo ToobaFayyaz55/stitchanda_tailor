@@ -94,7 +94,9 @@ class Tailor {
       review: (map['review'] is num) ? (map['review'] as num).toDouble() : double.tryParse(map['review']?.toString() ?? '') ?? 0.0,
       availibility_status: map['availibility_status'] as bool? ?? true,
       is_verified: map['is_verified'] as bool? ?? false,
-      verification_status: map['verification_status'] as int? ?? map['verification_status'] as int? ?? 0,
+      verification_status: map['verification_status'] as int?
+          ?? map['verfication_status'] as int?
+          ?? 0,
       address: TailorAddress.fromMap(addressMap),
       image_path: map['image_path'] as String? ?? '',
       cnic_front_image_path: map['cnic_front_image_path'] as String? ?? map['cnic_front_url'] as String? ?? '',

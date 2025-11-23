@@ -5,6 +5,7 @@ import 'package:stichanda_tailor/view/screens/login_screen.dart';
 import 'package:stichanda_tailor/view/screens/home_screen.dart';
 import 'package:stichanda_tailor/view/screens/pending_approval_screen.dart';
 import 'package:stichanda_tailor/view/screens/rejected_screen.dart';
+import 'package:stichanda_tailor/view/screens/splash_screen.dart';
 
 class SessionGate extends StatefulWidget {
   const SessionGate({super.key});
@@ -29,15 +30,23 @@ class _SessionGateState extends State<SessionGate> {
     return BlocConsumer<AuthCubit, AuthState>(
       listener: (context, state) {},
       builder: (context, state) {
+        // Show splash only while actively loading (bootstrap or other blocking ops)
+        if (state is AuthBootstrapLoading) {
+          return const SplashScreen();
+        }
         if (state is AuthLoading) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          // Keep user on current screen; decide based on prior authenticated state
+          // Fallback to Login if initial
+          return const LoginScreen();
+        }
+        // If no session and not loading -> go to Login
+        if (state is AuthInitial) {
+          return const LoginScreen();
         }
         if (state is RegistrationInProgress) {
           return PendingApprovalScreen(email: state.registrationData.email, name: state.registrationData.name);
         }
-        if (state is AuthInitial || state is AuthError) {
+        if (state is AuthError) {
           return const LoginScreen();
         }
         if (state is PendingApproval) {
@@ -54,4 +63,3 @@ class _SessionGateState extends State<SessionGate> {
     );
   }
 }
-
