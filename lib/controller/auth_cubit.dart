@@ -75,6 +75,7 @@ class AuthBootstrapLoading extends AuthState {
 class AuthCubit extends Cubit<AuthState> {
   final AuthRepo authRepo;
   Tailor? _registrationData;
+  static const Duration _splashDelay = Duration(milliseconds: 750); // minimum splash display time
 
   AuthCubit({required this.authRepo}) : super(const AuthInitial());
 
@@ -85,12 +86,12 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       emit(const AuthLoading());
       final tailor = await authRepo.login(email, password);
-
-      // Map verification_status: 0 pending, 1 verified, -2 rejected
+      // Show splash then transition
+      emit(const AuthBootstrapLoading());
+      await Future.delayed(_splashDelay);
       if (tailor.verification_status == 0) {
         emit(PendingApproval(email: tailor.email, name: tailor.name));
       } else if (tailor.verification_status == -2 || tailor.verification_status == 2) {
-        // Support legacy 2 as well as new -2
         emit(VerificationRejected(email: tailor.email, name: tailor.name));
       } else if (tailor.verification_status == 1) {
         emit(AuthSuccess(tailor));
@@ -98,6 +99,9 @@ class AuthCubit extends Cubit<AuthState> {
         emit(AuthError('Unknown verification status (${tailor.verification_status}).'));
       }
     } catch (e) {
+      // Ensure splash visible even on error for consistency
+      emit(const AuthBootstrapLoading());
+      await Future.delayed(_splashDelay);
       emit(AuthError(e.toString()));
     }
   }
@@ -320,15 +324,16 @@ class AuthCubit extends Cubit<AuthState> {
 
   /// Bootstrap existing session: if Firebase user exists fetch tailor doc and emit status-based state
   Future<void> bootstrapSession() async {
+    emit(const AuthBootstrapLoading());
     try {
       final user = authRepo.getCurrentUser();
       if (user == null) {
+        await Future.delayed(_splashDelay);
         emit(const AuthInitial());
         return;
       }
-      // Show splash only here
-      emit(const AuthBootstrapLoading());
       final tailor = await authRepo.fetchTailorById(user.uid);
+      await Future.delayed(_splashDelay);
       if (tailor.verification_status == 0) {
         emit(PendingApproval(email: tailor.email, name: tailor.name));
       } else if (tailor.verification_status == -2 || tailor.verification_status == 2) {
@@ -339,6 +344,7 @@ class AuthCubit extends Cubit<AuthState> {
         emit(AuthError('Unknown verification status (${tailor.verification_status}).'));
       }
     } catch (e) {
+      await Future.delayed(_splashDelay);
       emit(AuthError('Session bootstrap failed: $e'));
     }
   }
