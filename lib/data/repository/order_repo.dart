@@ -281,7 +281,7 @@ class OrderRepo {
 
   DateTime _timestampToDate(Timestamp? ts) => ts?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0);
 
-  /// Enrich a single order with customer name and earliest due date
+  /// Enrich a single order with customer name and earliest delivery date
   Future<Map<String, dynamic>> enrichOrderWithCustomerName(Map<String, dynamic> order) async {
     final customerId = order['customer_id'] as String?;
     if (customerId != null && customerId.isNotEmpty) {
@@ -291,40 +291,37 @@ class OrderRepo {
       }
     }
 
-    // Fetch earliest due_date from order_details
-    final orderId = order['order_id'] as String?;
-    if (orderId != null && orderId.isNotEmpty) {
-      try {
-        final detailsSnap = await _orderDetailsCol
-            .where('order_id', isEqualTo: orderId)
-            .get();
+    // If delivery_date already present on order doc (Timestamp), keep it. Otherwise derive from order_details due_data.
+    if (order['delivery_date'] == null) {
+      final orderId = order['order_id'] as String?;
+      if (orderId != null && orderId.isNotEmpty) {
+        try {
+          final detailsSnap = await _orderDetailsCol.where('order_id', isEqualTo: orderId).get();
 
-        // Find earliest due_data (closest deadline)
-        String? earliestDueDate;
-        DateTime? earliestDateTime;
+          String? earliestDueDateStr;
+          DateTime? earliestDateTime;
 
-        for (final doc in detailsSnap.docs) {
-          final data = doc.data() as Map<String, dynamic>;
-          final dueData = data['due_data'] as String?;
-
-          if (dueData != null && dueData.isNotEmpty) {
-            try {
-              final dt = DateTime.parse(dueData);
-              if (earliestDateTime == null || dt.isBefore(earliestDateTime)) {
-                earliestDateTime = dt;
-                earliestDueDate = dueData;
+            for (final doc in detailsSnap.docs) {
+              final data = doc.data() as Map<String, dynamic>;
+              final dueData = data['due_data'] as String?; // still stored as due_data in order_details
+              if (dueData != null && dueData.isNotEmpty) {
+                try {
+                  final dt = DateTime.parse(dueData);
+                  if (earliestDateTime == null || dt.isBefore(earliestDateTime)) {
+                    earliestDateTime = dt;
+                    earliestDueDateStr = dueData;
+                  }
+                } catch (_) {}
               }
-            } catch (e) {
-              // Skip invalid date strings
             }
-          }
-        }
 
-        if (earliestDueDate != null) {
-          order['due_date'] = earliestDueDate;
+          if (earliestDateTime != null) {
+            // Store as ISO string if we derived it (since we don't have server Timestamp here)
+            order['delivery_date'] = earliestDueDateStr;
+          }
+        } catch (_) {
+          // ignore enrichment failure
         }
-      } catch (e) {
-        // If fetching due date fails, continue without it
       }
     }
 

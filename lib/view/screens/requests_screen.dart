@@ -139,7 +139,7 @@ class _OrderRequestCard extends StatelessWidget {
     final orderId = (order['order_id'] as String?) ?? '';
     final totalPrice = (order['total_price'] as num?)?.toDouble() ?? 0.0;
     final customerName = (order['customer_name'] as String?) ?? 'Customer';
-    final dueDate = order['due_date'];
+    final dueDate = order['delivery_date'];
     final daysLeft = _calculateDaysLeft(dueDate);
     final daysLeftColor = _getDaysLeftColor(daysLeft);
 
@@ -300,11 +300,7 @@ class _OrderRequestCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.currency_rupee,
-                            size: 16,
-                            color: AppColors.caramel,
-                          ),
+                          const Text('PKR ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.caramel)),
                           Text(
                             totalPrice.toStringAsFixed(0),
                             style: const TextStyle(

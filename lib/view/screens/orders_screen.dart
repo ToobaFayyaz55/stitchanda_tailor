@@ -3,6 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:stichanda_tailor/theme/theme.dart';
 import 'package:stichanda_tailor/controller/order_cubit.dart';
 import 'package:stichanda_tailor/controller/auth_cubit.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:stichanda_tailor/modules/chat/cubit/chat_cubit.dart';
+import 'package:stichanda_tailor/modules/chat/screens/chat_screen.dart';
 import '../base/custom_bottom_nav_bar.dart';
 import 'order_details_screen.dart';
 
@@ -321,7 +326,7 @@ class _OrderCard extends StatelessWidget {
     }
 
     // Due date is now enriched from order_details collection (earliest due_data)
-    final dueDate = order['due_date'];
+    final dueDate = order['delivery_date'];
 
     // Customer name is now provided by the repository/controller enrichment
     final customerName = (order['customer_name'] as String?) ?? 'Customer';
@@ -341,6 +346,11 @@ class _OrderCard extends StatelessWidget {
 
     // Check if stitching is done (status 5 - can call rider)
     final isStitchingDone = status == OrderCubit.statusCompletedTailor;
+    // Rider related statuses
+    final isIncomingRider = status == OrderCubit.statusRiderAssignedCustomer || status == OrderCubit.statusPickedUpCustomer || status == OrderCubit.statusCompletedCustomer; // 1,2,3
+    final isReturnRiderFlow = status == OrderCubit.statusRiderAssignedTailor || status == OrderCubit.statusPickedFromTailor || status == OrderCubit.statusCompletedToCustomer; // 7,8,9
+    final incomingRiderId = order['rider_id'] as String?; // customer side rider
+    final returnRiderId = order['drop_off_rider_id'] as String?; // tailor side rider id field per requirement
 
     return Card(
       elevation: 3,
@@ -456,11 +466,8 @@ class _OrderCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.currency_rupee,
-                            size: 16,
-                            color: AppColors.caramel,
-                          ),
+                          const Text('PKR ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.caramel)),
+
                           Text(
                             totalPrice.toStringAsFixed(0),
                             style: const TextStyle(
@@ -577,6 +584,44 @@ class _OrderCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         elevation: 2,
+                      ),
+                    ),
+                  ),
+                ],
+
+                // Rider Details Button (incoming rider 1,2,3)
+                if (isIncomingRider && incomingRiderId != null && incomingRiderId.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showRiderDetails(context, incomingRiderId, false),
+                      icon: const Icon(Icons.directions_bike),
+                      label: const Text('Incoming Rider Details'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(color: AppColors.caramel.withValues(alpha: 0.4)),
+                        foregroundColor: AppColors.caramel,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                ],
+
+                // Rider Details Button (return rider 7,8,9)
+                if (isReturnRiderFlow && returnRiderId != null && returnRiderId.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showRiderDetails(context, returnRiderId, true),
+                      icon: const Icon(Icons.delivery_dining),
+                      label: const Text('Return Rider Details'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: BorderSide(color: Colors.blue.withValues(alpha: 0.4)),
+                        foregroundColor: Colors.blue,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     ),
                   ),
@@ -711,6 +756,152 @@ class _OrderCard extends StatelessWidget {
       }
     }
   }
+
+  Future<void> _showRiderDetails(BuildContext context, String riderId, bool isReturn) async {
+    final doc = await FirebaseFirestore.instance.collection('driver').doc(riderId).get();
+    final data = doc.data();
+    if (data == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rider details not found')));
+      }
+      return;
+    }
+    final name = data['name'] ?? 'Rider';
+    final phone = data['phone'] ?? '';
+    final image = data['profile_image_path'] ?? '';
+    if (!context.mounted) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(4)),
+              ),
+              const SizedBox(height: 16),
+              Text(isReturn ? 'Return Ride Details' : 'Pickup Rider Details', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 24),
+              CircleAvatar(
+                radius: 48,
+                backgroundImage: image.toString().isNotEmpty ? NetworkImage(image) : null,
+                backgroundColor: AppColors.beige,
+                child: image.toString().isEmpty ? const Icon(Icons.person, size: 42, color: AppColors.deepBrown) : null,
+              ),
+              const SizedBox(height: 16),
+              Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.textBlack)),
+              const SizedBox(height: 6),
+              Text(isReturn ? 'Return Rider' : 'Pickup Rider', style: const TextStyle(fontSize: 14, color: AppColors.textGrey)),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.orange.shade100),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.access_time, color: Colors.orange),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text('Estimated Arrival', style: TextStyle(fontSize: 12, color: AppColors.textGrey)),
+                          SizedBox(height: 4),
+                          Text('1 min', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textBlack)),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 42,
+                      color: Colors.orange.shade200,
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text('Distance', style: TextStyle(fontSize: 12, color: AppColors.textGrey)),
+                        SizedBox(height: 4),
+                        Text('0.0 km', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textBlack)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final me = FirebaseAuth.instance.currentUser?.uid;
+                        if (me == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Not authenticated')));
+                          return;
+                        }
+                        try {
+                          final conv = await context.read<ChatCubit>().startConversation(me, riderId);
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (context.mounted) {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(conversation: conv)));
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Chat error: $e')));
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      label: const Text('Chat'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final uri = Uri.parse('tel:$phone');
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cannot launch dialer')));
+                        }
+                      },
+                      icon: const Icon(Icons.call),
+                      label: Text(phone.isEmpty ? 'Call' : phone),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _StatusBadge extends StatelessWidget {
@@ -829,4 +1020,3 @@ class _DeadlineIndicator extends StatelessWidget {
     );
   }
 }
-

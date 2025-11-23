@@ -3,9 +3,9 @@ import 'package:stichanda_tailor/data/models/driver_model.dart';
 
 class RideRepo {
   final CollectionReference _orderDetailCollection =
-      FirebaseFirestore.instance.collection('orderDetail');
+      FirebaseFirestore.instance.collection('order_details');
   final CollectionReference _driverCollection =
-      FirebaseFirestore.instance.collection('drivers');
+      FirebaseFirestore.instance.collection('driver');
 
   // ==================== RIDE BOOKING STATUS CODES ====================
   static const int STATUS_DRIVER_REQUESTED = 6;

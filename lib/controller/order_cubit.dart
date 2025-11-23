@@ -184,6 +184,17 @@ class OrderCubit extends Cubit<OrderState> {
     }
   }
 
+  /// Mark order as self delivery (tailor will deliver) -> status 9
+  Future<void> markSelfDelivery({required String orderId}) async {
+    try {
+      emit(const OrderLoading());
+      await orderRepo.updateOrderStatus(orderId, OrderRepo.STATUS_COMPLETED_TO_CUSTOMER);
+      emit(const RequestAccepted());
+    } catch (e) {
+      emit(OrderError(e.toString()));
+    }
+  }
+
   // ---------- Existing compatibility: accept/reject by detailsId ----------
   Future<void> tailorAcceptRequest({required String detailsId, required String tailorId}) async {
     try {
@@ -244,17 +255,17 @@ class OrderCubit extends Cubit<OrderState> {
     if (status == OrderRepo.STATUS_UNACCEPTED) return 'Pending';
     if (status == OrderRepo.STATUS_ACCEPTED) return 'Accepted';
     if (status == OrderRepo.STATUS_REJECTED) return 'Rejected';
-    if (status == OrderRepo.STATUS_UNASSIGNED) return 'Unassigned';
-    if (status == OrderRepo.STATUS_RIDER_ASSIGNED_CUSTOMER) return 'Rider Assigned';
-    if (status == OrderRepo.STATUS_PICKED_UP_CUSTOMER) return 'Picked Up';
+    if (status == OrderRepo.STATUS_UNASSIGNED) return 'Customer Waiting for Rider';
+    if (status == OrderRepo.STATUS_RIDER_ASSIGNED_CUSTOMER) return 'Rider Assigned to Customer';
+    if (status == OrderRepo.STATUS_PICKED_UP_CUSTOMER) return 'Picked Up From Customer';
     if (status == OrderRepo.STATUS_COMPLETED_CUSTOMER) return 'Delivered'; // Changed from 'Completed' to 'Delivered'
     if (status == OrderRepo.STATUS_RECEIVED_TAILOR) return 'Received';
     if (status == OrderRepo.STATUS_COMPLETED_TAILOR) return 'Stitching Done';
-    if (status == OrderRepo.STATUS_CALL_RIDER_TAILOR) return 'Call Rider';
-    if (status == OrderRepo.STATUS_RIDER_ASSIGNED_TAILOR) return 'Rider Assigned';
-    if (status == OrderRepo.STATUS_PICKED_FROM_TAILOR) return 'Picked Up';
-    if (status == OrderRepo.STATUS_COMPLETED_TO_CUSTOMER) return 'Delivered';
-    if (status == OrderRepo.STATUS_CUSTOMER_CONFIRMED) return 'Confirmed';
+    if (status == OrderRepo.STATUS_CALL_RIDER_TAILOR) return 'Call Rider by Tailor';
+    if (status == OrderRepo.STATUS_RIDER_ASSIGNED_TAILOR) return 'Rider Assigned by Tailor';
+    if (status == OrderRepo.STATUS_PICKED_FROM_TAILOR) return 'Picked Up From Tailor';
+    if (status == OrderRepo.STATUS_COMPLETED_TO_CUSTOMER) return 'Delivered to Customer\n(Awaiting for Payment)';
+    if (status == OrderRepo.STATUS_CUSTOMER_CONFIRMED) return 'Confirmed by Customer';
     if (status == OrderRepo.STATUS_SELF_DELIVERY) return 'Self Delivery';
     return 'Unknown';
   }
