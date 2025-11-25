@@ -547,7 +547,15 @@ class _OrderCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.currency_rupee, size: 16, color: AppColors.caramel),
+                          const Text(
+                            'PKR',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.caramel,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
                           Text(
                             totalPrice.toStringAsFixed(0),
                             style: const TextStyle(
